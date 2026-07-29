@@ -116,11 +116,14 @@ const platforms = [
   // lower garden: sunken roots
   { x: 2500, y: 680, w: 350, h: 20 },
   { x: 3020, y: 680, w: 380, h: 20 },
-  { x: 2640, y: 775, w: 220, h: 18 },
-  { x: 3180, y: 775, w: 230, h: 18 },
-  { x: 2450, y: 865, w: 300, h: 18 },
-  { x: 2870, y: 850, w: 250, h: 18 },
-  { x: 3320, y: 865, w: 310, h: 18 },
+  { x: 2640, y: 755, w: 220, h: 18 },
+  { x: 3180, y: 755, w: 230, h: 18 },
+  { x: 2470, y: 825, w: 230, h: 18 },
+  { x: 3320, y: 825, w: 230, h: 18 },
+  { x: 2340, y: 890, w: 190, h: 18 },
+  { x: 3480, y: 890, w: 170, h: 18 },
+  { x: 2780, y: 820, w: 105, h: 18 },
+  { x: 3015, y: 820, w: 105, h: 18 },
   { x: 2300, y: 960, w: 600, h: 160 },
   { x: 3000, y: 960, w: 650, h: 160 }
 ];
@@ -175,7 +178,7 @@ const enemySeeds = [
   [3345, 178, "crawler", true], [3515, -115, "flyer", true],
   [3315, -272, "crawler", true], [3490, -390, "flyer", true],
   [2600, 648, "crawler", true], [3080, 648, "crawler", true],
-  [2820, 745, "flyer", true], [3390, 833, "crawler", true]
+  [2820, 745, "flyer", true], [3390, 793, "crawler", true]
 ];
 let enemies = [];
 let midBoss = null;
@@ -681,6 +684,7 @@ function spawnCoins(x, y, count) {
 function updateCoins(dt) {
   for (let i = coinDrops.length - 1; i >= 0; i--) {
     const coin = coinDrops[i];
+    const previousY = coin.y;
     coin.life -= dt;
     coin.vy += 920 * dt;
     const dx = player.x + player.w / 2 - coin.x;
@@ -694,16 +698,36 @@ function updateCoins(dt) {
     coin.x += coin.vx * dt;
     coin.y += coin.vy * dt;
     coin.vx *= Math.pow(.35, dt);
-    if (coin.y > FLOOR - 8) {
-      coin.y = FLOOR - 8;
-      coin.vy *= -.38;
+
+    if (coin.vy > 0) {
+      const coinRadius = 7;
+      const coinSurfaces = [
+        ...platforms,
+        ...movingPlatforms,
+        ...crumblePlatforms.filter(platform => platform.gone <= 0)
+      ];
+      let landingY = Infinity;
+
+      coinSurfaces.forEach(platform => {
+        const overPlatform = coin.x >= platform.x - coinRadius
+          && coin.x <= platform.x + platform.w + coinRadius;
+        const crossedTop = previousY + coinRadius <= platform.y
+          && coin.y + coinRadius >= platform.y;
+        if (overPlatform && crossedTop) landingY = Math.min(landingY, platform.y);
+      });
+
+      if (landingY < Infinity) {
+        coin.y = landingY - coinRadius;
+        coin.vy *= -.38;
+      }
     }
+
     if (distance < 25) {
       save.coins += coin.value;
       storeSave();
       coinDrops.splice(i, 1);
       beep(720 + (save.coins % 4) * 45, .055, "sine", .022);
-    } else if (coin.life <= 0) {
+    } else if (coin.life <= 0 || coin.y > WORLD_BOTTOM + 40) {
       coinDrops.splice(i, 1);
     }
   }
