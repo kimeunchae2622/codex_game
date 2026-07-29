@@ -33,7 +33,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 
 const saveDefault = {
   checkpoint: 90, dash: false, echoes: [], memories: [], defeated: [],
-  coins: 0, shopItems: [], opened: false
+  coins: 0, lostCoins: null, shopItems: [], opened: false
 };
 let save = loadSave();
 
@@ -48,7 +48,7 @@ const player = {
   grounded: false, coyote: 0, jumpBuffer: 0, airJumps: 0,
   hp: 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0),
   maxHp: 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0),
-  inv: 0, attack: 0, attackId: 0, dash: 0, dashCool: 0,
+  inv: 0, attack: 0, attackId: 0, attackDir: "side", dash: 0, dashCool: 0,
   look: 0, respawning: 0
 };
 
@@ -223,6 +223,8 @@ function openShop() {
 function closeShop() {
   shopOpen = false;
   shopScreen.classList.add("hidden");
+  keys.delete("KeyA");
+  taps.delete("KeyA");
   last = performance.now();
 }
 
@@ -251,7 +253,11 @@ function buyShopItem(id) {
 }
 
 addEventListener("keydown", e => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "Escape"].includes(e.code)) e.preventDefault();
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "Escape"].includes(e.code)) e.preventDefault();
+  if (e.code === "KeyA" && shopOpen) {
+    closeShop();
+    return;
+  }
   if (!keys.has(e.code)) taps.add(e.code);
   keys.add(e.code);
   if (e.code === "Escape" && shopOpen) closeShop();
@@ -285,7 +291,6 @@ document.querySelectorAll("[data-reset-game]").forEach(button => {
     location.reload();
   });
 });
-document.querySelector("#closeShopButton").addEventListener("click", closeShop);
 document.querySelectorAll("[data-shop-item]").forEach(button => {
   button.addEventListener("click", () => buyShopItem(button.dataset.shopItem));
 });
@@ -364,7 +369,38 @@ function hurt(amount, sourceX) {
   if (player.hp <= 0) respawn();
 }
 
+function safeCoinDropPosition(x) {
+  const groundPlatforms = platforms.filter(p => p.h > 50);
+  let best = groundPlatforms[0];
+  let bestDistance = Infinity;
+  let safeX = x;
+  groundPlatforms.forEach(platform => {
+    const candidateX = clamp(x, platform.x + 24, platform.x + platform.w - 24);
+    const distance = Math.abs(candidateX - x);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = platform;
+      safeX = candidateX;
+    }
+  });
+  return { x: safeX, y: best.y - 11 };
+}
+
+function dropCoinsOnDeath() {
+  const previousLost = save.lostCoins?.amount || 0;
+  const amount = save.coins + previousLost;
+  if (amount <= 0) return 0;
+  const position = safeCoinDropPosition(player.x + player.w / 2);
+  save.lostCoins = { amount, x: position.x, y: position.y };
+  save.coins = 0;
+  storeSave();
+  puff(position.x, position.y, "#ffd36b", 22, 190);
+  return amount;
+}
+
 function respawn() {
+  if (player.respawning > 0) return;
+  const droppedCoins = dropCoinsOnDeath();
   player.respawning = .8;
   setTimeout(() => {
     player.x = save.checkpoint;
@@ -374,13 +410,21 @@ function respawn() {
     player.inv = 1.5;
     player.respawning = 0;
     resetEntities();
-    toast("마지막 등불에서 눈을 떴습니다");
+    toast(droppedCoins > 0
+      ? `코인 ${droppedCoins}개를 떨어뜨렸습니다 · 표시된 더미에서 회수하세요`
+      : "마지막 등불에서 눈을 떴습니다", 3200);
   }, 700);
 }
 
 function attackRect() {
   const improved = save.shopItems.includes("weapon");
   const reach = improved ? 66 : 56;
+  if (player.attackDir === "up") {
+    return { x: player.x - 14, y: player.y - (improved ? 58 : 50), w: 56, h: improved ? 66 : 58 };
+  }
+  if (player.attackDir === "down") {
+    return { x: player.x - 14, y: player.y + player.h - 8, w: 56, h: improved ? 66 : 58 };
+  }
   return { x: player.dir > 0 ? player.x + 20 : player.x - (improved ? 58 : 48), y: player.y + 5, w: reach, h: 36 };
 }
 
@@ -431,6 +475,7 @@ function updatePlayer(dt) {
   if (!down("KeyZ") && player.vy < -170) player.vy += 1200 * dt;
 
   if (tap("KeyX") && player.attack <= 0) {
+    player.attackDir = down("ArrowUp") ? "up" : down("ArrowDown") ? "down" : "side";
     player.attack = .22; player.attackId++;
     beep(480, .07, "sawtooth", .035);
   }
@@ -445,6 +490,22 @@ function updatePlayer(dt) {
 
   player.look = lerp(player.look, down("ArrowUp") ? -1 : down("ArrowDown") ? 1 : 0, 1 - Math.pow(.005, dt));
   moveAndCollide(dt);
+
+  if (save.lostCoins) {
+    const distance = Math.hypot(
+      player.x + player.w / 2 - save.lostCoins.x,
+      player.y + player.h / 2 - save.lostCoins.y
+    );
+    if (distance < 36) {
+      const recovered = save.lostCoins.amount;
+      save.coins += recovered;
+      save.lostCoins = null;
+      storeSave();
+      toast(`떨어뜨린 코인 ${recovered}개를 되찾았습니다`, 2800);
+      puff(player.x + player.w / 2, player.y + player.h / 2, "#ffe28a", 28, 210);
+      beep(880, .55, "sine", .06);
+    }
+  }
 
   if (Math.abs(player.x + player.w / 2 - (merchant.x + merchant.w / 2)) < 58 && player.y > 385 && tap("ArrowDown")) {
     openShop();
@@ -844,6 +905,25 @@ function drawWorld() {
   }
 
   enemies.forEach(drawEnemy);
+  if (save.lostCoins) {
+    const lost = save.lostCoins;
+    ctx.save();
+    ctx.translate(lost.x, lost.y + Math.sin(time * 3) * 2);
+    ctx.shadowColor = "#ffb943";
+    ctx.shadowBlur = 18;
+    for (let i = 0; i < 5; i++) {
+      const angle = i * Math.PI * 2 / 5 + time * .35;
+      ctx.fillStyle = i % 2 ? "#d9912f" : "#ffd56d";
+      ctx.beginPath();
+      ctx.arc(Math.cos(angle) * 9, Math.sin(angle) * 5 - 4, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#fff0b0";
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(`${lost.amount} ◈`, 0, -19);
+    ctx.restore();
+  }
   coinDrops.forEach(coin => {
     ctx.save();
     ctx.translate(coin.x, coin.y);
@@ -926,7 +1006,15 @@ function drawPlayer() {
     ctx.strokeStyle = improved ? "#ffe2a0" : "#dff9ff";
     ctx.shadowColor = improved ? "#ffbd55" : "#8cecff";
     ctx.shadowBlur = 12; ctx.lineWidth = improved ? 6 : 5;
-    ctx.beginPath(); ctx.arc(9, 1, improved ? 40 : 34, -1.4 + t * .7, .8 + t * .7); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.beginPath();
+    if (player.attackDir === "up") {
+      ctx.arc(0, -8, improved ? 42 : 36, Math.PI * (1.08 + t * .18), Math.PI * (1.92 + t * .18));
+    } else if (player.attackDir === "down") {
+      ctx.arc(0, 10, improved ? 42 : 36, Math.PI * (.08 + t * .18), Math.PI * (.92 + t * .18));
+    } else {
+      ctx.arc(9, 1, improved ? 40 : 34, -1.4 + t * .7, .8 + t * .7);
+    }
+    ctx.stroke(); ctx.shadowBlur = 0;
   }
   ctx.restore();
 }
