@@ -88,6 +88,20 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
 .overlay h2 { font-family: Georgia, "Noto Serif KR", serif; font-size: clamp(32px, 7vw, 64px); letter-spacing: -.06em; text-shadow: 0 0 30px #93dcff77; }
 .overlay > p:not(.kicker) { color: #b9c4d9; line-height: 1.8; }
 .overlay button { margin-top: 8px; padding: 13px 24px; background: linear-gradient(135deg, #324264, #26304b); box-shadow: 0 0 25px #7edaff33; }
+.overlay .reset-button {
+  margin-top: -5px;
+  padding: 9px 17px;
+  color: #d49aa8;
+  border-color: rgba(214, 124, 148, .25);
+  background: rgba(94, 34, 52, .12);
+  box-shadow: none;
+  font-size: 12px;
+}
+.overlay .reset-button:hover {
+  color: #ffd5df;
+  border-color: rgba(255, 145, 174, .5);
+  background: rgba(120, 42, 63, .3);
+}
 .overlay small { color: #71809d; }
 .title-mark { color: #d8f6ff; font-size: 48px; text-shadow: 0 0 26px #8fe6ff; }
 

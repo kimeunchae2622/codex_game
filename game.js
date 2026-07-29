@@ -277,6 +277,14 @@ document.querySelector("#startButton").addEventListener("click", () => {
   requestAnimationFrame(loop);
 });
 document.querySelector("#resumeButton").addEventListener("click", togglePause);
+document.querySelectorAll("[data-reset-game]").forEach(button => {
+  button.addEventListener("click", () => {
+    const confirmed = confirm("체크포인트, 코인, 능력, 수집품과 상점 구매를 모두 지우고 처음부터 시작할까요?");
+    if (!confirmed) return;
+    localStorage.removeItem("forgottenGarden");
+    location.reload();
+  });
+});
 document.querySelector("#closeShopButton").addEventListener("click", closeShop);
 document.querySelectorAll("[data-shop-item]").forEach(button => {
   button.addEventListener("click", () => buyShopItem(button.dataset.shopItem));
