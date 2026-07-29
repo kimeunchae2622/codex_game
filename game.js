@@ -18,6 +18,7 @@ const taps = new Set();
 let running = false;
 let paused = false;
 let shopOpen = false;
+let shopSelection = 0;
 let last = 0;
 let time = 0;
 let shake = 0;
@@ -33,7 +34,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 
 const saveDefault = {
   checkpoint: 90, dash: false, echoes: [], memories: [], defeated: [],
-  coins: 0, lostCoins: null, shopItems: [], opened: false
+  coins: 0, lostCoins: null, shopItems: [], opened: false, midBossDefeated: false
 };
 let save = loadSave();
 
@@ -55,6 +56,7 @@ const player = {
 const camera = { x: 0, y: 0 };
 const particles = [];
 const coinDrops = [];
+const bossProjectiles = [];
 const merchant = { x: 1810, y: FLOOR - 47, w: 34, h: 47 };
 const shopCatalog = {
   weapon: { cost: 8, name: "새벽의 칼날" },
@@ -143,6 +145,7 @@ const enemySeeds = [
   [4970, 270, "flyer"], [5380, 330, "crawler"], [5580, 250, "flyer"]
 ];
 let enemies = [];
+let midBoss = null;
 let boss = null;
 
 function supportTopAt(x) {
@@ -158,13 +161,20 @@ function resetEntities() {
   enemies = enemySeeds.map((e, i) => ({
     id: i, x: e[0], y: e[2] === "crawler" ? supportTopAt(e[0]) - 32 : e[1], baseY: e[1], w: e[2] === "flyer" ? 34 : 38,
     h: e[2] === "flyer" ? 28 : 32, type: e[2], hp: e[2] === "flyer" ? 2 : 3,
-    dir: i % 2 ? -1 : 1, hit: 0, dead: false, phase: i * 1.7, lastAttack: -1
+    dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7, lastAttack: -1
   }));
+  midBoss = {
+    x: 4380, y: FLOOR - 78, w: 62, h: 78, hp: 12, maxHp: 12, dir: -1,
+    active: false, dead: save.midBossDefeated, hit: 0, cooldown: .8,
+    action: "idle", timer: 0, cycle: 0, vx: 0, vy: 0, lastAttack: -1
+  };
   boss = {
-    x: 5700, y: 367, w: 82, h: 108, hp: 22, maxHp: 22, dir: -1,
-    active: false, dead: false, hit: 0, attack: 0, jump: 0, vx: 0, vy: 0, lastAttack: -1
+    x: 5700, y: 367, w: 82, h: 108, hp: 30, maxHp: 30, dir: -1,
+    active: false, dead: false, hit: 0, cooldown: 1, action: "idle",
+    timer: 0, cycle: 0, vx: 0, vy: 0, lastAttack: -1
   };
   coinDrops.length = 0;
+  bossProjectiles.length = 0;
   crumblePlatforms.forEach(p => {
     p.timer = 0;
     p.gone = 0;
@@ -199,24 +209,28 @@ function puff(x, y, color = "#b9eeff", count = 8, speed = 150) {
 
 function down(code) { return keys.has(code); }
 function tap(code) { return taps.has(code); }
+const shopButtons = [...document.querySelectorAll("[data-shop-item]")];
 
 function updateShopUI(message = "몬스터가 떨어뜨린 코인으로 장비를 준비하세요.") {
   shopCoinsEl.textContent = save.coins;
   shopMessageEl.textContent = message;
-  document.querySelectorAll("[data-shop-item]").forEach(button => {
+  shopButtons.forEach((button, index) => {
     const id = button.dataset.shopItem;
     const owned = save.shopItems.includes(id);
     button.disabled = owned;
     button.classList.toggle("owned", owned);
+    button.classList.toggle("selected", index === shopSelection);
     button.querySelector("b").textContent = owned ? "구매 완료" : `${shopCatalog[id].cost} ◈`;
   });
 }
 
 function openShop() {
   shopOpen = true;
+  const firstAvailable = shopButtons.findIndex(button => !save.shopItems.includes(button.dataset.shopItem));
+  shopSelection = firstAvailable >= 0 ? firstAvailable : 0;
   keys.clear();
   taps.clear();
-  updateShopUI();
+  updateShopUI("방향키로 품목 선택 · Z 구매 · A 나가기");
   shopScreen.classList.remove("hidden");
 }
 
@@ -233,8 +247,8 @@ function buyShopItem(id) {
   if (!item || save.shopItems.includes(id)) return;
   if (id === "bellKey") {
     const gearReady = ["weapon", "armor", "doubleJump"].every(itemId => save.shopItems.includes(itemId));
-    if (!gearReady || save.echoes.length < 3 || save.memories.length < 3) {
-      updateShopUI("열쇠는 모든 메아리·뿌리 기억과 세 가지 장비를 갖춘 뒤 살 수 있습니다.");
+    if (!gearReady || save.echoes.length < 3 || save.memories.length < 3 || !save.midBossDefeated) {
+      updateShopUI("열쇠는 모든 수집품·장비와 중간 보스 처치가 필요합니다.");
       return;
     }
   }
@@ -252,16 +266,31 @@ function buyShopItem(id) {
   beep(id === "bellKey" ? 880 : 650, .45, "sine", .055);
 }
 
+function moveShopSelection(code) {
+  const columns = 2;
+  const rows = Math.ceil(shopButtons.length / columns);
+  const row = Math.floor(shopSelection / columns);
+  const column = shopSelection % columns;
+  if (code === "ArrowLeft") shopSelection = row * columns + (column + columns - 1) % columns;
+  if (code === "ArrowRight") shopSelection = row * columns + (column + 1) % columns;
+  if (code === "ArrowUp") shopSelection = ((row + rows - 1) % rows) * columns + column;
+  if (code === "ArrowDown") shopSelection = ((row + 1) % rows) * columns + column;
+  shopSelection = clamp(shopSelection, 0, shopButtons.length - 1);
+  updateShopUI("방향키로 품목 선택 · Z 구매 · A 나가기");
+  beep(420 + shopSelection * 35, .04, "sine", .018);
+}
+
 addEventListener("keydown", e => {
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "Escape"].includes(e.code)) e.preventDefault();
-  if (e.code === "KeyA" && shopOpen) {
-    closeShop();
+  if (shopOpen) {
+    if (e.code === "KeyA") closeShop();
+    else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) moveShopSelection(e.code);
+    else if (e.code === "KeyZ") buyShopItem(shopButtons[shopSelection].dataset.shopItem);
     return;
   }
   if (!keys.has(e.code)) taps.add(e.code);
   keys.add(e.code);
-  if (e.code === "Escape" && shopOpen) closeShop();
-  else if (e.code === "Escape" && running) togglePause();
+  if (e.code === "Escape" && running) togglePause();
 });
 addEventListener("keyup", e => keys.delete(e.code));
 
@@ -291,8 +320,11 @@ document.querySelectorAll("[data-reset-game]").forEach(button => {
     location.reload();
   });
 });
-document.querySelectorAll("[data-shop-item]").forEach(button => {
-  button.addEventListener("click", () => buyShopItem(button.dataset.shopItem));
+shopButtons.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    shopSelection = index;
+    updateShopUI("선택한 품목은 키보드 Z로 구매하세요.");
+  });
 });
 document.querySelector("#soundButton").addEventListener("click", e => {
   soundOn = !soundOn;
@@ -327,6 +359,7 @@ function moveAndCollide(dt) {
     ...crumblePlatforms.filter(p => p.gone <= 0)
   ];
   if (!save.opened) solids.push({ x: 3978, y: 150, w: 34, h: 325, gate: "echo" });
+  if (!save.midBossDefeated) solids.push({ x: 4620, y: 130, w: 38, h: 345, gate: "midboss" });
   if (!save.shopItems.includes("bellKey")) solids.push({ x: 5155, y: 130, w: 38, h: 345, gate: "boss" });
   for (const p of solids) {
     if (!overlap(player, p)) continue;
@@ -334,6 +367,7 @@ function moveAndCollide(dt) {
     else if (player.vx < 0) player.x = p.x + p.w;
     player.vx = 0;
     if (p.gate === "echo" && save.echoes.length < 3) toast(`침묵의 문 · 메아리 ${save.echoes.length}/3`);
+    if (p.gate === "midboss") toast("수문장이 길을 막고 있습니다 · 중간 보스를 처치하세요");
     if (p.gate === "boss") toast("종루의 최종 관문 · 상점에서 종루의 열쇠를 준비하세요");
   }
 
@@ -387,14 +421,16 @@ function safeCoinDropPosition(x) {
 }
 
 function dropCoinsOnDeath() {
-  const previousLost = save.lostCoins?.amount || 0;
-  const amount = save.coins + previousLost;
-  if (amount <= 0) return 0;
-  const position = safeCoinDropPosition(player.x + player.w / 2);
-  save.lostCoins = { amount, x: position.x, y: position.y };
+  const amount = save.coins;
+  if (amount > 0) {
+    const position = safeCoinDropPosition(player.x + player.w / 2);
+    save.lostCoins = { amount, x: position.x, y: position.y };
+    puff(position.x, position.y, "#ffd36b", 22, 190);
+  } else {
+    save.lostCoins = null;
+  }
   save.coins = 0;
   storeSave();
-  puff(position.x, position.y, "#ffd36b", 22, 190);
   return amount;
 }
 
@@ -588,6 +624,8 @@ function updateEnemies(dt) {
       beep(220, .07, "square", .035);
       if (e.hp <= 0) {
         e.dead = true;
+        if (!save.defeated.includes(e.id)) save.defeated.push(e.id);
+        storeSave();
         spawnCoins(e.x + e.w / 2, e.y + e.h / 2, e.type === "flyer" ? 4 : 3);
         puff(e.x, e.y, "#7186a8", 18, 180);
       }
@@ -637,34 +675,196 @@ function updateCoins(dt) {
   }
 }
 
+function fireBossProjectile(x, y, angle, speed, color = "#b89cff", radius = 8, gravity = 0) {
+  bossProjectiles.push({
+    x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+    color, r: radius, gravity, life: 5
+  });
+}
+
+function fireAimedVolley(source, count, spread, speed, color) {
+  const originX = source.x + source.w / 2;
+  const originY = source.y + source.h * .35;
+  const targetAngle = Math.atan2(
+    player.y + player.h / 2 - originY,
+    player.x + player.w / 2 - originX
+  );
+  for (let i = 0; i < count; i++) {
+    const offset = count === 1 ? 0 : (i / (count - 1) - .5) * spread;
+    fireBossProjectile(originX, originY, targetAngle + offset, speed, color, 7);
+  }
+}
+
+function spawnShockwaves(x, enraged = false) {
+  const speeds = enraged ? [250, 390] : [260];
+  speeds.forEach(speed => {
+    fireBossProjectile(x, FLOOR - 12, 0, speed, "#d4a8ff", 11);
+    fireBossProjectile(x, FLOOR - 12, Math.PI, speed, "#d4a8ff", 11);
+  });
+  shake = enraged ? 18 : 12;
+  puff(x, FLOOR - 10, "#c69cff", enraged ? 32 : 20, 230);
+  beep(82, .35, "sawtooth", .065);
+}
+
+function updateBossProjectiles(dt) {
+  for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+    const projectile = bossProjectiles[i];
+    projectile.life -= dt;
+    projectile.vy += projectile.gravity * dt;
+    projectile.x += projectile.vx * dt;
+    projectile.y += projectile.vy * dt;
+    if (Math.random() < .28) {
+      particles.push({
+        x: projectile.x, y: projectile.y, vx: rnd(-20, 20), vy: rnd(-20, 20),
+        life: .18, max: .18, color: projectile.color, r: rnd(1, 3)
+      });
+    }
+    const hazard = {
+      x: projectile.x - projectile.r, y: projectile.y - projectile.r,
+      w: projectile.r * 2, h: projectile.r * 2
+    };
+    if (overlap(player, hazard)) {
+      hurt(1, projectile.x);
+      bossProjectiles.splice(i, 1);
+      continue;
+    }
+    if (projectile.life <= 0 || projectile.x < 3900 || projectile.x > WORLD_W + 80 || projectile.y < -80 || projectile.y > H + 100) {
+      bossProjectiles.splice(i, 1);
+    }
+  }
+}
+
+function updateMidBoss(dt) {
+  if (save.opened && player.x > 4140 && !midBoss.dead) midBoss.active = true;
+  if (!midBoss.active || midBoss.dead) return;
+  midBoss.hit -= dt;
+  midBoss.cooldown -= dt;
+  midBoss.timer -= dt;
+  midBoss.dir = player.x < midBoss.x ? -1 : 1;
+  midBoss.vy += 1250 * dt;
+  midBoss.x += midBoss.vx * dt;
+  midBoss.y += midBoss.vy * dt;
+  let landed = false;
+  if (midBoss.y + midBoss.h >= FLOOR) {
+    landed = midBoss.vy > 100;
+    midBoss.y = FLOOR - midBoss.h;
+    midBoss.vy = 0;
+  }
+  midBoss.x = clamp(midBoss.x, 4070, 4550);
+
+  if (midBoss.action === "dash") {
+    midBoss.vx = midBoss.dir * 280;
+    if (midBoss.timer <= 0) { midBoss.action = "idle"; midBoss.cooldown = .65; }
+  } else if (midBoss.action === "jump") {
+    midBoss.vx = midBoss.dir * 95;
+    if (landed && midBoss.timer < 1.1) {
+      spawnShockwaves(midBoss.x + midBoss.w / 2, false);
+      midBoss.action = "idle"; midBoss.cooldown = .85;
+    }
+  } else if (midBoss.action === "cast") {
+    midBoss.vx *= Math.pow(.04, dt);
+    if (midBoss.timer <= 0) { midBoss.action = "idle"; midBoss.cooldown = .75; }
+  } else {
+    midBoss.vx *= Math.pow(.02, dt);
+    if (midBoss.cooldown <= 0) {
+      midBoss.cycle++;
+      if (midBoss.cycle % 3 === 1) {
+        midBoss.action = "dash"; midBoss.timer = .55;
+      } else if (midBoss.cycle % 3 === 2) {
+        midBoss.action = "jump"; midBoss.timer = 1.5; midBoss.vy = -470;
+      } else {
+        midBoss.action = "cast"; midBoss.timer = .65;
+        fireAimedVolley(midBoss, 3, .5, 235, "#84d8dd");
+        beep(210, .22, "triangle", .045);
+      }
+    }
+  }
+
+  const hitbox = player.attack > .07 ? attackRect() : null;
+  if (hitbox && overlap(hitbox, midBoss) && midBoss.lastAttack !== player.attackId) {
+    const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+    midBoss.lastAttack = player.attackId;
+    midBoss.hp -= attackPower;
+    midBoss.hit = .16;
+    midBoss.vx += player.dir * 75;
+    shake = 6;
+    puff(midBoss.x + midBoss.w / 2, midBoss.y + 30, "#8ce4df", 11, 160);
+    if (midBoss.hp <= 0) {
+      midBoss.dead = true;
+      midBoss.active = false;
+      save.midBossDefeated = true;
+      storeSave();
+      bossProjectiles.length = 0;
+      spawnCoins(midBoss.x + midBoss.w / 2, midBoss.y + midBoss.h / 2, 12);
+      shake = 20;
+      puff(midBoss.x + 30, midBoss.y + 35, "#b9fff1", 55, 290);
+      toast("수문장을 쓰러뜨렸습니다 · 종루로 향하는 길이 열렸습니다", 3500);
+    }
+  }
+  if (overlap(player, midBoss)) hurt(1, midBoss.x + midBoss.w / 2);
+}
+
 function updateBoss(dt) {
   if (save.shopItems.includes("bellKey") && player.x > 5480 && !boss.dead) boss.active = true;
   if (!boss.active || boss.dead) return;
-  boss.hit -= dt; boss.attack -= dt;
+  const enraged = boss.hp <= boss.maxHp / 2;
+  boss.hit -= dt;
+  boss.cooldown -= dt;
+  boss.timer -= dt;
   boss.dir = player.x < boss.x ? -1 : 1;
-  boss.vy += 1200 * dt;
-  boss.x += boss.vx * dt; boss.y += boss.vy * dt;
-  if (boss.y + boss.h > FLOOR) { boss.y = FLOOR - boss.h; boss.vy = 0; }
+  boss.vy += 1350 * dt;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+  let landed = false;
+  if (boss.y + boss.h >= FLOOR) {
+    landed = boss.vy > 130;
+    boss.y = FLOOR - boss.h;
+    boss.vy = 0;
+  }
   boss.x = clamp(boss.x, 5350, 6080);
 
-  if (boss.attack <= 0) {
-    if (Math.abs(player.x - boss.x) > 170) {
-      boss.vx = boss.dir * 155;
-      boss.attack = .75;
-    } else {
-      boss.vx = boss.dir * 310; boss.vy = -410; boss.attack = 1.2;
-      beep(95, .25, "sawtooth", .05);
+  if (boss.action === "dash") {
+    boss.vx = boss.dir * (enraged ? 465 : 365);
+    if (Math.random() < .35) puff(boss.x + boss.w / 2, boss.y + 55, "#9b76db", 2, 55);
+    if (boss.timer <= 0) { boss.action = "idle"; boss.cooldown = enraged ? .35 : .62; }
+  } else if (boss.action === "slam") {
+    boss.vx = boss.dir * (enraged ? 135 : 95);
+    if (landed && boss.timer < 1.25) {
+      spawnShockwaves(boss.x + boss.w / 2, enraged);
+      boss.action = "idle"; boss.cooldown = enraged ? .4 : .72;
     }
-  } else boss.vx *= Math.pow(.12, dt);
+  } else if (boss.action === "volley") {
+    boss.vx *= Math.pow(.03, dt);
+    if (boss.timer <= 0) { boss.action = "idle"; boss.cooldown = enraged ? .35 : .7; }
+  } else {
+    boss.vx *= Math.pow(.02, dt);
+    if (boss.cooldown <= 0) {
+      boss.cycle++;
+      const skill = boss.cycle % 3;
+      if (skill === 1) {
+        boss.action = "dash"; boss.timer = enraged ? .7 : .56;
+        beep(105, .22, "sawtooth", .055);
+      } else if (skill === 2) {
+        boss.action = "slam"; boss.timer = 1.7; boss.vy = enraged ? -610 : -540;
+        beep(145, .2, "square", .045);
+      } else {
+        boss.action = "volley"; boss.timer = enraged ? .95 : .75;
+        fireAimedVolley(boss, enraged ? 7 : 5, enraged ? 1.35 : .9, enraged ? 315 : 265, "#c89bff");
+        puff(boss.x + boss.w / 2, boss.y + 32, "#d5a6ff", enraged ? 25 : 16, 170);
+        beep(260, .34, "sine", .055);
+      }
+    }
+  }
 
   const hitbox = player.attack > .07 ? attackRect() : null;
   if (hitbox && overlap(hitbox, boss) && boss.lastAttack !== player.attackId) {
     const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
     boss.lastAttack = player.attackId; boss.hp -= attackPower; boss.hit = .15; boss.vx += player.dir * 90;
-    shake = 7; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 10, 170);
+    shake = 8; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 13, 180);
     if (boss.hp <= 0) {
       boss.dead = true; boss.active = false; boss.vx = 0;
-      shake = 25; puff(boss.x + 40, boss.y + 50, "#e7fbff", 80, 300);
+      bossProjectiles.length = 0;
+      shake = 28; puff(boss.x + 40, boss.y + 50, "#e7fbff", 95, 330);
       setTimeout(win, 900);
     }
   }
@@ -677,7 +877,9 @@ function update(dt) {
   updatePlayer(dt);
   updateEnemies(dt);
   updateCoins(dt);
+  updateMidBoss(dt);
   updateBoss(dt);
+  updateBossProjectiles(dt);
   particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 170 * dt; p.vx *= Math.pow(.08, dt); });
   for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
   const targetX = clamp(player.x - W * .44, 0, WORLD_W - W);
@@ -859,6 +1061,18 @@ function drawWorld() {
     for (let y = 170; y < 460; y += 45) { ctx.beginPath(); ctx.arc(3995, y, 10, 0, Math.PI * 2); ctx.stroke(); }
   }
 
+  if (!save.midBossDefeated) {
+    ctx.fillStyle = "#142528";
+    ctx.fillRect(4620, 130, 38, 345);
+    ctx.strokeStyle = "#66c6c4";
+    ctx.lineWidth = 2;
+    for (let y = 150; y < 455; y += 42) {
+      ctx.beginPath();
+      ctx.arc(4639, y, 9, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
   if (!save.shopItems.includes("bellKey")) {
     ctx.fillStyle = "#1b1821";
     ctx.fillRect(5155, 130, 38, 345);
@@ -905,6 +1119,7 @@ function drawWorld() {
   }
 
   enemies.forEach(drawEnemy);
+  if (midBoss && !midBoss.dead) drawMidBoss();
   if (save.lostCoins) {
     const lost = save.lostCoins;
     ctx.save();
@@ -939,6 +1154,23 @@ function drawWorld() {
     ctx.stroke();
     ctx.restore();
   });
+  bossProjectiles.forEach(projectile => {
+    ctx.save();
+    ctx.translate(projectile.x, projectile.y);
+    ctx.shadowColor = projectile.color;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = projectile.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, projectile.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = .45;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, projectile.r + 4 + Math.sin(time * 9) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
   if (boss && !boss.dead) drawBoss();
   drawPlayer();
 
@@ -965,15 +1197,70 @@ function drawEnemy(e) {
   ctx.restore(); ctx.shadowBlur = 0;
 }
 
-function drawBoss() {
-  ctx.save(); ctx.translate(boss.x + boss.w / 2, boss.y + boss.h / 2); ctx.scale(boss.dir, 1);
-  if (boss.hit > 0) ctx.globalAlpha = .55;
-  ctx.fillStyle = "#26243b"; ctx.beginPath(); ctx.ellipse(0, 12, 39, 53, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#d7e3ee"; ctx.beginPath(); ctx.ellipse(0, -35, 29, 34, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "#d7e3ee"; ctx.lineWidth = 8; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(-15, -57); ctx.quadraticCurveTo(-34, -88, -45, -64); ctx.moveTo(15, -57); ctx.quadraticCurveTo(34, -88, 45, -64); ctx.stroke();
-  ctx.fillStyle = "#111624"; ctx.beginPath(); ctx.arc(-9, -35, 4, 0, Math.PI * 2); ctx.arc(9, -35, 4, 0, Math.PI * 2); ctx.fill();
+function drawMidBoss() {
+  ctx.save();
+  ctx.translate(midBoss.x + midBoss.w / 2, midBoss.y + midBoss.h / 2);
+  ctx.scale(midBoss.dir, 1);
+  if (midBoss.hit > 0) ctx.globalAlpha = .5;
+  ctx.shadowColor = "#68d8d1";
+  ctx.shadowBlur = midBoss.action === "cast" ? 26 : 12;
+  ctx.fillStyle = "#243f43";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 29, 38, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#b9ded9";
+  ctx.beginPath();
+  ctx.ellipse(0, -20, 22, 25, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#8acfc8";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-11, -37); ctx.quadraticCurveTo(-26, -61, -35, -43);
+  ctx.moveTo(11, -37); ctx.quadraticCurveTo(26, -61, 35, -43);
+  ctx.stroke();
+  ctx.fillStyle = "#173035";
+  ctx.beginPath();
+  ctx.arc(-7, -21, 3, 0, Math.PI * 2);
+  ctx.arc(7, -21, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#76e0d7";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-25, 0); ctx.lineTo(-42, 18);
+  ctx.moveTo(25, 0); ctx.lineTo(42, 18);
+  ctx.stroke();
   ctx.restore();
+  ctx.shadowBlur = 0;
+}
+
+function drawBoss() {
+  const enraged = boss.hp <= boss.maxHp / 2;
+  ctx.save(); ctx.translate(boss.x + boss.w / 2, boss.y + boss.h / 2);
+  ctx.save();
+  ctx.globalAlpha = enraged ? .5 : .28;
+  ctx.strokeStyle = enraged ? "#f080ff" : "#a77de0";
+  ctx.lineWidth = enraged ? 5 : 3;
+  ctx.shadowColor = "#d07aff";
+  ctx.shadowBlur = 22;
+  for (let i = 0; i < (enraged ? 3 : 2); i++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, 52 + i * 13 + Math.sin(time * 3 + i) * 5, time * (i % 2 ? -1 : 1), time * (i % 2 ? -1 : 1) + Math.PI * 1.35);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.scale(boss.dir, 1);
+  if (boss.hit > 0) ctx.globalAlpha = .55;
+  ctx.shadowColor = enraged ? "#e56cff" : "#8d70c4";
+  ctx.shadowBlur = enraged ? 24 : 12;
+  ctx.fillStyle = enraged ? "#3d1f49" : "#26243b"; ctx.beginPath(); ctx.ellipse(0, 12, 39, 53, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#d7e3ee"; ctx.beginPath(); ctx.ellipse(0, -35, 29, 34, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = enraged ? "#f0c8ff" : "#d7e3ee"; ctx.lineWidth = 8; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-15, -57); ctx.quadraticCurveTo(-38, -93, -50, -63); ctx.moveTo(15, -57); ctx.quadraticCurveTo(38, -93, 50, -63); ctx.stroke();
+  ctx.fillStyle = enraged ? "#c537e8" : "#111624";
+  ctx.beginPath(); ctx.arc(-9, -35, enraged ? 5 : 4, 0, Math.PI * 2); ctx.arc(9, -35, enraged ? 5 : 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.shadowBlur = 0;
 }
 
 function drawPlayer() {
@@ -1042,10 +1329,11 @@ function drawHUD() {
 
   const room = player.x < 1500 ? "이끼 낀 회랑" : player.x < 3000 ? "빗물의 뿌리" : player.x < 4050 ? "별 없는 온실" : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(213,232,248,.65)"; ctx.font = "12px Georgia, serif"; ctx.fillText(room, W / 2, 31);
-  const explored = save.echoes.length + save.memories.length + save.shopItems.length + (save.dash ? 1 : 0);
+  const explored = save.echoes.length + save.memories.length + save.shopItems.length
+    + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
   ctx.font = "10px system-ui";
   ctx.fillStyle = "rgba(159,183,204,.55)";
-  ctx.fillText(`정원 탐색도 ${Math.round(explored / 11 * 100)}%`, W / 2, 47);
+  ctx.fillText(`정원 탐색도 ${Math.round(explored / 12 * 100)}%`, W / 2, 47);
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(5,9,18,.7)";
@@ -1059,11 +1347,14 @@ function drawHUD() {
     ctx.fillRect(28, 52, 28, 3);
   }
 
-  if (boss?.active && !boss.dead) {
+  const activeBoss = boss?.active && !boss.dead ? boss : midBoss?.active && !midBoss.dead ? midBoss : null;
+  if (activeBoss) {
     const bw = 360, x = (W - bw) / 2, y = H - 32;
     ctx.fillStyle = "#141827"; ctx.fillRect(x, y, bw, 7);
-    ctx.fillStyle = "#bca6e5"; ctx.fillRect(x, y, bw * boss.hp / boss.maxHp, 7);
-    ctx.fillStyle = "#d9d4ea"; ctx.font = "11px system-ui"; ctx.fillText("종지기", W / 2, y - 7);
+    ctx.fillStyle = activeBoss === boss ? "#c58dea" : "#70d5cd";
+    ctx.fillRect(x, y, bw * activeBoss.hp / activeBoss.maxHp, 7);
+    ctx.fillStyle = "#d9d4ea"; ctx.font = "11px system-ui";
+    ctx.fillText(activeBoss === boss ? "심연의 종지기" : "청록 수문장", W / 2, y - 7);
   }
   ctx.restore();
 }
