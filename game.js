@@ -4,16 +4,20 @@ const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d");
 const startScreen = document.querySelector("#startScreen");
 const pauseScreen = document.querySelector("#pauseScreen");
+const shopScreen = document.querySelector("#shopScreen");
+const shopCoinsEl = document.querySelector("#shopCoins");
+const shopMessageEl = document.querySelector("#shopMessage");
 const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
-const WORLD_W = 5100;
+const WORLD_W = 6200;
 const FLOOR = 475;
 
 const keys = new Set();
 const taps = new Set();
 let running = false;
 let paused = false;
+let shopOpen = false;
 let last = 0;
 let time = 0;
 let shake = 0;
@@ -27,7 +31,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 const rnd = (a, b) => a + Math.random() * (b - a);
 
-const saveDefault = { checkpoint: 90, dash: false, echoes: [], memories: [], defeated: [], opened: false };
+const saveDefault = {
+  checkpoint: 90, dash: false, echoes: [], memories: [], defeated: [],
+  coins: 0, shopItems: [], opened: false
+};
 let save = loadSave();
 
 function loadSave() {
@@ -38,14 +45,23 @@ function storeSave() { localStorage.setItem("forgottenGarden", JSON.stringify(sa
 
 const player = {
   x: save.checkpoint, y: 380, w: 28, h: 43, vx: 0, vy: 0, dir: 1,
-  grounded: false, coyote: 0, jumpBuffer: 0,
-  hp: 5 + save.memories.length, maxHp: 5 + save.memories.length,
+  grounded: false, coyote: 0, jumpBuffer: 0, airJumps: 0,
+  hp: 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0),
+  maxHp: 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0),
   inv: 0, attack: 0, attackId: 0, dash: 0, dashCool: 0,
   look: 0, respawning: 0
 };
 
 const camera = { x: 0, y: 0 };
 const particles = [];
+const coinDrops = [];
+const merchant = { x: 1810, y: FLOOR - 47, w: 34, h: 47 };
+const shopCatalog = {
+  weapon: { cost: 8, name: "새벽의 칼날" },
+  armor: { cost: 10, name: "이끼 갑옷" },
+  doubleJump: { cost: 12, name: "나방의 날개" },
+  bellKey: { cost: 6, name: "종루의 열쇠" }
+};
 const motes = Array.from({ length: 90 }, (_, i) => ({
   x: (i * 137.3) % WORLD_W, y: 50 + (i * 83.1) % 390, r: rnd(.5, 2), phase: rnd(0, 6.28), depth: rnd(.15, .75)
 }));
@@ -57,80 +73,98 @@ const platforms = [
   { x: 2340, y: FLOOR, w: 570, h: 100 },
   { x: 3000, y: FLOOR, w: 990, h: 100 },
   { x: 4090, y: FLOOR, w: 1010, h: 100 },
-  { x: 310, y: 375, w: 170, h: 18 },
-  { x: 820, y: 392, w: 180, h: 18 },
-  { x: 1100, y: 312, w: 175, h: 18 },
-  { x: 1360, y: 385, w: 100, h: 18 },
-  { x: 1580, y: 354, w: 180, h: 18 },
-  { x: 1870, y: 290, w: 145, h: 18 },
-  { x: 2110, y: 385, w: 135, h: 18 },
-  { x: 2430, y: 374, w: 150, h: 18 },
-  { x: 2680, y: 292, w: 160, h: 18 },
-  { x: 3050, y: 385, w: 190, h: 18 },
-  { x: 3310, y: 305, w: 180, h: 18 },
-  { x: 3570, y: 385, w: 170, h: 18 },
-  { x: 3840, y: 330, w: 150, h: 18 },
-  { x: 4170, y: 365, w: 185, h: 18 },
-  { x: 4430, y: 290, w: 150, h: 18 },
-  { x: 4710, y: 370, w: 155, h: 18 }
+  { x: 5200, y: FLOOR, w: 1000, h: 100 },
+  { x: 310, y: 405, w: 170, h: 18 },
+  { x: 820, y: 420, w: 180, h: 18 },
+  { x: 1100, y: 360, w: 175, h: 18 },
+  { x: 1360, y: 415, w: 100, h: 18 },
+  { x: 1580, y: 395, w: 180, h: 18 },
+  { x: 1870, y: 350, w: 145, h: 18 },
+  { x: 2110, y: 420, w: 135, h: 18 },
+  { x: 2430, y: 410, w: 150, h: 18 },
+  { x: 2680, y: 350, w: 160, h: 18 },
+  { x: 3050, y: 420, w: 190, h: 18 },
+  { x: 3310, y: 360, w: 180, h: 18 },
+  { x: 3570, y: 420, w: 170, h: 18 },
+  { x: 3840, y: 380, w: 150, h: 18 },
+  { x: 4170, y: 405, w: 185, h: 18 },
+  { x: 4430, y: 350, w: 150, h: 18 },
+  { x: 4710, y: 410, w: 155, h: 18 },
+  { x: 4950, y: 365, w: 150, h: 18 },
+  { x: 5280, y: 410, w: 150, h: 18 },
+  { x: 5480, y: 355, w: 160, h: 18 },
+  { x: 5820, y: 405, w: 170, h: 18 }
 ];
 
 const movingPlatforms = [
-  { x: 615, y: 358, w: 92, h: 16, baseX: 615, baseY: 358, axis: "y", range: 65, speed: 1.25, phase: 0, dx: 0, dy: 0, moving: true },
-  { x: 2247, y: 338, w: 96, h: 16, baseX: 2247, baseY: 338, axis: "x", range: 55, speed: 1.05, phase: 1.8, dx: 0, dy: 0, moving: true },
-  { x: 2910, y: 342, w: 90, h: 16, baseX: 2910, baseY: 342, axis: "y", range: 78, speed: 1.4, phase: 3.1, dx: 0, dy: 0, moving: true },
-  { x: 3992, y: 315, w: 100, h: 16, baseX: 3992, baseY: 315, axis: "x", range: 70, speed: 1.15, phase: 4.4, dx: 0, dy: 0, moving: true }
+  { x: 615, y: 388, w: 92, h: 16, baseX: 615, baseY: 388, axis: "y", range: 40, speed: 1.25, phase: 0, dx: 0, dy: 0, moving: true },
+  { x: 2247, y: 375, w: 96, h: 16, baseX: 2247, baseY: 375, axis: "x", range: 55, speed: 1.05, phase: 1.8, dx: 0, dy: 0, moving: true },
+  { x: 2910, y: 382, w: 90, h: 16, baseX: 2910, baseY: 382, axis: "y", range: 45, speed: 1.4, phase: 3.1, dx: 0, dy: 0, moving: true },
+  { x: 3992, y: 365, w: 100, h: 16, baseX: 3992, baseY: 365, axis: "x", range: 70, speed: 1.15, phase: 4.4, dx: 0, dy: 0, moving: true },
+  { x: 5095, y: 395, w: 105, h: 16, baseX: 5095, baseY: 395, axis: "y", range: 38, speed: 1.3, phase: 2.2, dx: 0, dy: 0, moving: true }
 ];
 
 const crumblePlatforms = [
-  { x: 520, y: 314, w: 82, h: 15, timer: 0, gone: 0, crumble: true },
-  { x: 1450, y: 338, w: 76, h: 15, timer: 0, gone: 0, crumble: true },
-  { x: 2290, y: 262, w: 84, h: 15, timer: 0, gone: 0, crumble: true },
-  { x: 2860, y: 382, w: 72, h: 15, timer: 0, gone: 0, crumble: true },
-  { x: 4025, y: 235, w: 88, h: 15, timer: 0, gone: 0, crumble: true }
+  { x: 520, y: 360, w: 82, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 1450, y: 380, w: 76, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 2290, y: 330, w: 84, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 2860, y: 417, w: 72, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 4025, y: 320, w: 88, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 5660, y: 410, w: 90, h: 15, timer: 0, gone: 0, crumble: true }
 ];
 
 const spikes = [
   { x: 620, y: 455, w: 80, h: 20 }, { x: 1460, y: 455, w: 65, h: 20 },
   { x: 2245, y: 455, w: 95, h: 20 }, { x: 2910, y: 455, w: 90, h: 20 },
-  { x: 3990, y: 455, w: 100, h: 20 }
+  { x: 3990, y: 455, w: 100, h: 20 }, { x: 5100, y: 455, w: 100, h: 20 }
 ];
 
 const checkpointData = [
-  { x: 115, y: 421 }, { x: 1690, y: 300 }, { x: 3150, y: 431 }
+  { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 }
 ];
 
 const echoes = [
-  { id: "뿌리", x: 1185, y: 275 },
-  { id: "비", x: 2760, y: 250 },
-  { id: "별", x: 3395, y: 263 }
+  { id: "뿌리", x: 1185, y: 323 },
+  { id: "비", x: 2760, y: 313 },
+  { id: "별", x: 3395, y: 323 }
 ];
 
 const memoryBlooms = [
-  { id: "새벽", x: 429, y: 342 },
-  { id: "물결", x: 918, y: 359 },
-  { id: "심연", x: 2505, y: 341 }
+  { id: "새벽", x: 429, y: 372 },
+  { id: "물결", x: 918, y: 387 },
+  { id: "심연", x: 2505, y: 377 }
 ];
 
 const enemySeeds = [
   [520, 432, "crawler"], [880, 349, "crawler"], [1260, 432, "crawler"],
   [1640, 311, "crawler"], [2020, 420, "flyer"], [2480, 331, "crawler"],
   [2690, 210, "flyer"], [3140, 342, "crawler"], [3540, 410, "flyer"],
-  [3700, 342, "crawler"], [4200, 322, "crawler"]
+  [3700, 342, "crawler"], [4200, 322, "crawler"], [4740, 330, "crawler"],
+  [4970, 270, "flyer"], [5380, 330, "crawler"], [5580, 250, "flyer"]
 ];
 let enemies = [];
 let boss = null;
 
+function supportTopAt(x) {
+  const supports = platforms.filter(p => x >= p.x && x <= p.x + p.w).map(p => p.y);
+  return supports.length ? Math.min(...supports) : FLOOR;
+}
+
+function getMaxHp() {
+  return 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0);
+}
+
 function resetEntities() {
   enemies = enemySeeds.map((e, i) => ({
-    id: i, x: e[0], y: e[1], baseY: e[1], w: e[2] === "flyer" ? 34 : 38,
+    id: i, x: e[0], y: e[2] === "crawler" ? supportTopAt(e[0]) - 32 : e[1], baseY: e[1], w: e[2] === "flyer" ? 34 : 38,
     h: e[2] === "flyer" ? 28 : 32, type: e[2], hp: e[2] === "flyer" ? 2 : 3,
-    dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7, lastAttack: -1
+    dir: i % 2 ? -1 : 1, hit: 0, dead: false, phase: i * 1.7, lastAttack: -1
   }));
   boss = {
-    x: 4590, y: 367, w: 82, h: 108, hp: 16, maxHp: 16, dir: -1,
+    x: 5700, y: 367, w: 82, h: 108, hp: 22, maxHp: 22, dir: -1,
     active: false, dead: false, hit: 0, attack: 0, jump: 0, vx: 0, vy: 0, lastAttack: -1
   };
+  coinDrops.length = 0;
   crumblePlatforms.forEach(p => {
     p.timer = 0;
     p.gone = 0;
@@ -166,11 +200,62 @@ function puff(x, y, color = "#b9eeff", count = 8, speed = 150) {
 function down(code) { return keys.has(code); }
 function tap(code) { return taps.has(code); }
 
+function updateShopUI(message = "몬스터가 떨어뜨린 코인으로 장비를 준비하세요.") {
+  shopCoinsEl.textContent = save.coins;
+  shopMessageEl.textContent = message;
+  document.querySelectorAll("[data-shop-item]").forEach(button => {
+    const id = button.dataset.shopItem;
+    const owned = save.shopItems.includes(id);
+    button.disabled = owned;
+    button.classList.toggle("owned", owned);
+    button.querySelector("b").textContent = owned ? "구매 완료" : `${shopCatalog[id].cost} ◈`;
+  });
+}
+
+function openShop() {
+  shopOpen = true;
+  keys.clear();
+  taps.clear();
+  updateShopUI();
+  shopScreen.classList.remove("hidden");
+}
+
+function closeShop() {
+  shopOpen = false;
+  shopScreen.classList.add("hidden");
+  last = performance.now();
+}
+
+function buyShopItem(id) {
+  const item = shopCatalog[id];
+  if (!item || save.shopItems.includes(id)) return;
+  if (id === "bellKey") {
+    const gearReady = ["weapon", "armor", "doubleJump"].every(itemId => save.shopItems.includes(itemId));
+    if (!gearReady || save.echoes.length < 3 || save.memories.length < 3) {
+      updateShopUI("열쇠는 모든 메아리·뿌리 기억과 세 가지 장비를 갖춘 뒤 살 수 있습니다.");
+      return;
+    }
+  }
+  if (save.coins < item.cost) {
+    updateShopUI(`${item.name} 구매에 코인이 ${item.cost - save.coins}개 더 필요합니다.`);
+    return;
+  }
+  save.coins -= item.cost;
+  save.shopItems.push(id);
+  player.maxHp = getMaxHp();
+  player.hp = player.maxHp;
+  storeSave();
+  updateShopUI(`${item.name}을(를) 구매했습니다.`);
+  puff(merchant.x, merchant.y, id === "bellKey" ? "#ffe19a" : "#a8f0dd", 20, 150);
+  beep(id === "bellKey" ? 880 : 650, .45, "sine", .055);
+}
+
 addEventListener("keydown", e => {
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "Escape"].includes(e.code)) e.preventDefault();
   if (!keys.has(e.code)) taps.add(e.code);
   keys.add(e.code);
-  if (e.code === "Escape" && running) togglePause();
+  if (e.code === "Escape" && shopOpen) closeShop();
+  else if (e.code === "Escape" && running) togglePause();
 });
 addEventListener("keyup", e => keys.delete(e.code));
 
@@ -192,6 +277,10 @@ document.querySelector("#startButton").addEventListener("click", () => {
   requestAnimationFrame(loop);
 });
 document.querySelector("#resumeButton").addEventListener("click", togglePause);
+document.querySelector("#closeShopButton").addEventListener("click", closeShop);
+document.querySelectorAll("[data-shop-item]").forEach(button => {
+  button.addEventListener("click", () => buyShopItem(button.dataset.shopItem));
+});
 document.querySelector("#soundButton").addEventListener("click", e => {
   soundOn = !soundOn;
   e.currentTarget.textContent = soundOn ? "소리 끄기" : "소리 켜기";
@@ -224,13 +313,15 @@ function moveAndCollide(dt) {
     ...movingPlatforms,
     ...crumblePlatforms.filter(p => p.gone <= 0)
   ];
-  if (!save.opened) solids.push({ x: 3978, y: 150, w: 34, h: 325, gate: true });
+  if (!save.opened) solids.push({ x: 3978, y: 150, w: 34, h: 325, gate: "echo" });
+  if (!save.shopItems.includes("bellKey")) solids.push({ x: 5155, y: 130, w: 38, h: 345, gate: "boss" });
   for (const p of solids) {
     if (!overlap(player, p)) continue;
     if (player.vx > 0) player.x = p.x - player.w;
     else if (player.vx < 0) player.x = p.x + p.w;
     player.vx = 0;
-    if (p.gate && save.echoes.length < 3) toast(`침묵의 문 · 메아리 ${save.echoes.length}/3`);
+    if (p.gate === "echo" && save.echoes.length < 3) toast(`침묵의 문 · 메아리 ${save.echoes.length}/3`);
+    if (p.gate === "boss") toast("종루의 최종 관문 · 상점에서 종루의 열쇠를 준비하세요");
   }
 
   player.grounded = false;
@@ -242,6 +333,7 @@ function moveAndCollide(dt) {
       player.vy = 0;
       player.grounded = true;
       player.coyote = .1;
+      player.airJumps = save.shopItems.includes("doubleJump") ? 1 : 0;
       if (p.moving) player.x += p.dx;
       if (p.crumble && p.timer === 0) p.timer = .001;
     } else if (player.vy < 0) {
@@ -279,7 +371,9 @@ function respawn() {
 }
 
 function attackRect() {
-  return { x: player.dir > 0 ? player.x + 20 : player.x - 48, y: player.y + 5, w: 56, h: 36 };
+  const improved = save.shopItems.includes("weapon");
+  const reach = improved ? 66 : 56;
+  return { x: player.dir > 0 ? player.x + 20 : player.x - (improved ? 58 : 48), y: player.y + 5, w: reach, h: 36 };
 }
 
 function updatePlatforms(dt) {
@@ -318,11 +412,13 @@ function updatePlayer(dt) {
   player.coyote -= dt; player.jumpBuffer -= dt;
 
   if (tap("KeyZ")) player.jumpBuffer = .13;
-  if (player.jumpBuffer > 0 && player.coyote > 0 && player.dash <= 0) {
-    player.vy = -520;
+  if (player.jumpBuffer > 0 && player.dash <= 0 && (player.coyote > 0 || player.airJumps > 0)) {
+    const airJump = player.coyote <= 0;
+    if (airJump) player.airJumps--;
+    player.vy = airJump ? -485 : -520;
     player.grounded = false; player.coyote = 0; player.jumpBuffer = 0;
-    puff(player.x + 14, player.y + player.h, "#9fb8ce", 7, 90);
-    beep(280, .08, "triangle", .04);
+    puff(player.x + 14, player.y + player.h, airJump ? "#d8c8ff" : "#9fb8ce", airJump ? 13 : 7, airJump ? 140 : 90);
+    beep(airJump ? 440 : 280, .08, "triangle", .04);
   }
   if (!down("KeyZ") && player.vy < -170) player.vy += 1200 * dt;
 
@@ -341,6 +437,11 @@ function updatePlayer(dt) {
 
   player.look = lerp(player.look, down("ArrowUp") ? -1 : down("ArrowDown") ? 1 : 0, 1 - Math.pow(.005, dt));
   moveAndCollide(dt);
+
+  if (Math.abs(player.x + player.w / 2 - (merchant.x + merchant.w / 2)) < 58 && player.y > 385 && tap("ArrowDown")) {
+    openShop();
+    return;
+  }
 
   if (!platformHintShown && player.x > 430) {
     platformHintShown = true;
@@ -361,7 +462,7 @@ function updatePlayer(dt) {
   if (!save.dash && Math.abs(player.x - 1918) < 55 && player.y < 390) {
     save.dash = true; storeSave();
     toast("능력 해방 · C 그림자 대시 · 지나쳐 온 기억 봉인을 깨세요", 4200);
-    puff(1918, 255, "#aa9cff", 35, 230); beep(720, .7, "sine", .06);
+    puff(1918, 315, "#aa9cff", 35, 230); beep(720, .7, "sine", .06);
   }
 
   memoryBlooms.forEach(memory => {
@@ -369,7 +470,7 @@ function updatePlayer(dt) {
     const seal = { x: memory.x - 18, y: memory.y - 22, w: 36, h: 44 };
     if (player.dash > 0 && overlap(player, seal)) {
       save.memories.push(memory.id);
-      player.maxHp = 5 + save.memories.length;
+      player.maxHp = getMaxHp();
       player.hp = player.maxHp;
       storeSave();
       shake = 15;
@@ -412,28 +513,70 @@ function updateEnemies(dt) {
       if (Math.abs(player.x - e.x) < 260) e.x += Math.sign(player.x - e.x) * 34 * dt;
     }
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
-      e.lastAttack = player.attackId; e.hp--; e.hit = .18; e.x += player.dir * 24;
+      const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+      e.lastAttack = player.attackId; e.hp -= attackPower; e.hit = .18; e.x += player.dir * 24;
       shake = 4; puff(e.x + e.w / 2, e.y + e.h / 2, "#baf0ff", 8, 130);
       beep(220, .07, "square", .035);
       if (e.hp <= 0) {
         e.dead = true;
-        if (!save.defeated.includes(e.id)) save.defeated.push(e.id);
-        storeSave(); puff(e.x, e.y, "#7186a8", 18, 180);
+        spawnCoins(e.x + e.w / 2, e.y + e.h / 2, e.type === "flyer" ? 4 : 3);
+        puff(e.x, e.y, "#7186a8", 18, 180);
       }
     }
     if (overlap(player, e)) hurt(1, e.x + e.w / 2);
   });
 }
 
+function spawnCoins(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    coinDrops.push({
+      x, y, vx: rnd(-115, 115), vy: rnd(-320, -190),
+      value: 1, life: 18, phase: rnd(0, Math.PI * 2)
+    });
+  }
+  beep(520, .12, "triangle", .035);
+}
+
+function updateCoins(dt) {
+  for (let i = coinDrops.length - 1; i >= 0; i--) {
+    const coin = coinDrops[i];
+    coin.life -= dt;
+    coin.vy += 920 * dt;
+    const dx = player.x + player.w / 2 - coin.x;
+    const dy = player.y + player.h / 2 - coin.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 155) {
+      const pull = (1 - distance / 155) * 850;
+      coin.vx += dx / Math.max(distance, 1) * pull * dt;
+      coin.vy += dy / Math.max(distance, 1) * pull * dt;
+    }
+    coin.x += coin.vx * dt;
+    coin.y += coin.vy * dt;
+    coin.vx *= Math.pow(.35, dt);
+    if (coin.y > FLOOR - 8) {
+      coin.y = FLOOR - 8;
+      coin.vy *= -.38;
+    }
+    if (distance < 25) {
+      save.coins += coin.value;
+      storeSave();
+      coinDrops.splice(i, 1);
+      beep(720 + (save.coins % 4) * 45, .055, "sine", .022);
+    } else if (coin.life <= 0) {
+      coinDrops.splice(i, 1);
+    }
+  }
+}
+
 function updateBoss(dt) {
-  if (save.opened && player.x > 4300 && !boss.dead) boss.active = true;
+  if (save.shopItems.includes("bellKey") && player.x > 5480 && !boss.dead) boss.active = true;
   if (!boss.active || boss.dead) return;
   boss.hit -= dt; boss.attack -= dt;
   boss.dir = player.x < boss.x ? -1 : 1;
   boss.vy += 1200 * dt;
   boss.x += boss.vx * dt; boss.y += boss.vy * dt;
   if (boss.y + boss.h > FLOOR) { boss.y = FLOOR - boss.h; boss.vy = 0; }
-  boss.x = clamp(boss.x, 4220, 4920);
+  boss.x = clamp(boss.x, 5350, 6080);
 
   if (boss.attack <= 0) {
     if (Math.abs(player.x - boss.x) > 170) {
@@ -447,7 +590,8 @@ function updateBoss(dt) {
 
   const hitbox = player.attack > .07 ? attackRect() : null;
   if (hitbox && overlap(hitbox, boss) && boss.lastAttack !== player.attackId) {
-    boss.lastAttack = player.attackId; boss.hp--; boss.hit = .15; boss.vx += player.dir * 90;
+    const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+    boss.lastAttack = player.attackId; boss.hp -= attackPower; boss.hit = .15; boss.vx += player.dir * 90;
     shake = 7; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 10, 170);
     if (boss.hp <= 0) {
       boss.dead = true; boss.active = false; boss.vx = 0;
@@ -463,6 +607,7 @@ function update(dt) {
   updatePlatforms(dt);
   updatePlayer(dt);
   updateEnemies(dt);
+  updateCoins(dt);
   updateBoss(dt);
   particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 170 * dt; p.vx *= Math.pow(.08, dt); });
   for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
@@ -582,10 +727,10 @@ function drawWorld() {
   });
 
   // dash shrine
-  ctx.fillStyle = "#2b294d"; ctx.fillRect(1890, 242, 58, 48);
+  ctx.fillStyle = "#2b294d"; ctx.fillRect(1890, 302, 58, 48);
   ctx.strokeStyle = save.dash ? "#8f82b7" : "#c7bfff"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(1919, 247, 22, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = "#b9afff"; ctx.font = "17px serif"; ctx.fillText("◇", 1911, 253);
+  ctx.beginPath(); ctx.arc(1919, 307, 22, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = "#b9afff"; ctx.font = "17px serif"; ctx.fillText("◇", 1911, 313);
 
   echoes.forEach((e, i) => {
     if (save.echoes.includes(e.id)) return;
@@ -645,7 +790,67 @@ function drawWorld() {
     for (let y = 170; y < 460; y += 45) { ctx.beginPath(); ctx.arc(3995, y, 10, 0, Math.PI * 2); ctx.stroke(); }
   }
 
+  if (!save.shopItems.includes("bellKey")) {
+    ctx.fillStyle = "#1b1821";
+    ctx.fillRect(5155, 130, 38, 345);
+    ctx.strokeStyle = "#b89757";
+    ctx.lineWidth = 2;
+    for (let y = 155; y < 455; y += 48) {
+      ctx.beginPath();
+      ctx.moveTo(5163, y);
+      ctx.lineTo(5185, y + 22);
+      ctx.moveTo(5185, y);
+      ctx.lineTo(5163, y + 22);
+      ctx.stroke();
+    }
+  }
+
+  // merchant
+  ctx.save();
+  ctx.translate(merchant.x + merchant.w / 2, merchant.y + merchant.h / 2);
+  ctx.fillStyle = "#42354b";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 18, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#d9c9b1";
+  ctx.beginPath();
+  ctx.ellipse(0, -10, 12, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#c6a66a";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-13, -17);
+  ctx.quadraticCurveTo(0, -33, 15, -16);
+  ctx.stroke();
+  ctx.fillStyle = "#ffe3a2";
+  ctx.beginPath();
+  ctx.arc(0, -9, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  if (Math.abs(player.x + player.w / 2 - (merchant.x + merchant.w / 2)) < 70 && player.y > 375) {
+    ctx.fillStyle = "rgba(7,10,18,.82)";
+    ctx.fillRect(merchant.x - 52, merchant.y - 35, 138, 24);
+    ctx.fillStyle = "#ffe1a3";
+    ctx.font = "12px system-ui";
+    ctx.fillText("↓ 상점 열기", merchant.x - 12, merchant.y - 19);
+  }
+
   enemies.forEach(drawEnemy);
+  coinDrops.forEach(coin => {
+    ctx.save();
+    ctx.translate(coin.x, coin.y);
+    ctx.rotate(time * 4 + coin.phase);
+    ctx.shadowColor = "#ffcf65";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#f5bc4d";
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#fff0ad";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  });
   if (boss && !boss.dead) drawBoss();
   drawPlayer();
 
@@ -692,7 +897,16 @@ function drawPlayer() {
     for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.ellipse(-i * 17, 2, 12, 19, 0, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
-  ctx.fillStyle = "#172033"; ctx.beginPath(); ctx.ellipse(0, 9, 13, 18, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = save.shopItems.includes("armor") ? "#28505a" : "#172033";
+  ctx.beginPath(); ctx.ellipse(0, 9, save.shopItems.includes("armor") ? 15 : 13, 18, 0, 0, Math.PI * 2); ctx.fill();
+  if (save.shopItems.includes("armor")) {
+    ctx.strokeStyle = "#83b8b7";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-13, 1); ctx.lineTo(-18, 8);
+    ctx.moveTo(13, 1); ctx.lineTo(18, 8);
+    ctx.stroke();
+  }
   ctx.fillStyle = "#e9f3f8"; ctx.beginPath(); ctx.ellipse(0, -11, 11, 14, 0, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = "#e9f3f8"; ctx.lineWidth = 4; ctx.lineCap = "round";
   ctx.beginPath(); ctx.moveTo(-5, -20); ctx.quadraticCurveTo(-10, -33, -15, -27); ctx.moveTo(5, -20); ctx.quadraticCurveTo(10, -33, 15, -27); ctx.stroke();
@@ -700,8 +914,11 @@ function drawPlayer() {
   ctx.strokeStyle = "#9dc2d7"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-10, 6); ctx.quadraticCurveTo(-22, 16, -16, 28); ctx.stroke();
   if (player.attack > 0) {
     const t = 1 - player.attack / .22;
-    ctx.strokeStyle = "#dff9ff"; ctx.shadowColor = "#8cecff"; ctx.shadowBlur = 12; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.arc(9, 1, 34, -1.4 + t * .7, .8 + t * .7); ctx.stroke(); ctx.shadowBlur = 0;
+    const improved = save.shopItems.includes("weapon");
+    ctx.strokeStyle = improved ? "#ffe2a0" : "#dff9ff";
+    ctx.shadowColor = improved ? "#ffbd55" : "#8cecff";
+    ctx.shadowBlur = 12; ctx.lineWidth = improved ? 6 : 5;
+    ctx.beginPath(); ctx.arc(9, 1, improved ? 40 : 34, -1.4 + t * .7, .8 + t * .7); ctx.stroke(); ctx.shadowBlur = 0;
   }
   ctx.restore();
 }
@@ -727,12 +944,19 @@ function drawHUD() {
   ctx.font = "11px system-ui";
   ctx.fillText(`뿌리 기억  ${save.memories.length} / 3`, W - 145, 74);
 
-  const room = player.x < 1500 ? "이끼 낀 회랑" : player.x < 3000 ? "빗물의 뿌리" : player.x < 4050 ? "별 없는 온실" : "침묵의 종루";
+  const room = player.x < 1500 ? "이끼 낀 회랑" : player.x < 3000 ? "빗물의 뿌리" : player.x < 4050 ? "별 없는 온실" : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(213,232,248,.65)"; ctx.font = "12px Georgia, serif"; ctx.fillText(room, W / 2, 31);
-  const explored = save.echoes.length + save.memories.length + (save.dash ? 1 : 0);
+  const explored = save.echoes.length + save.memories.length + save.shopItems.length + (save.dash ? 1 : 0);
   ctx.font = "10px system-ui";
   ctx.fillStyle = "rgba(159,183,204,.55)";
-  ctx.fillText(`정원 탐색도 ${Math.round(explored / 7 * 100)}%`, W / 2, 47);
+  ctx.fillText(`정원 탐색도 ${Math.round(explored / 11 * 100)}%`, W / 2, 47);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(5,9,18,.7)";
+  ctx.fillRect(27, 66, 92, 27);
+  ctx.fillStyle = "#ffd477";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText(`◈  ${save.coins}`, 40, 84);
 
   if (save.dash) {
     ctx.textAlign = "left"; ctx.fillStyle = player.dashCool <= 0 ? "#a99cff" : "#39405b";
@@ -760,7 +984,7 @@ function render() {
 
 function win() {
   running = false;
-  const completeGarden = save.memories.length === memoryBlooms.length;
+  const completeGarden = save.memories.length === memoryBlooms.length && save.shopItems.length === 4;
   const endingTitle = completeGarden ? "모든 뿌리가 깨어났습니다" : "정원이 깨어났습니다";
   const endingText = completeGarden
     ? "되찾은 기억이 정원 전체에 번져<br>잊힌 종이 완전한 음색으로 울립니다."
@@ -779,7 +1003,9 @@ function loop(now) {
   if (!running || paused) return;
   const dt = Math.min((now - last) / 1000, .033);
   last = now;
-  update(dt); render();
+  if (!shopOpen) update(dt);
+  else taps.clear();
+  render();
   requestAnimationFrame(loop);
 }
 

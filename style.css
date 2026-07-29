@@ -91,6 +91,41 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
 .overlay small { color: #71809d; }
 .title-mark { color: #d8f6ff; font-size: 48px; text-shadow: 0 0 26px #8fe6ff; }
 
+.shop-overlay {
+  align-content: center;
+  gap: 10px;
+  background: radial-gradient(circle at 50% 45%, rgba(35, 29, 50, .94), rgba(4, 6, 13, .98));
+}
+
+.shop-overlay h2 { font-size: clamp(28px, 5vw, 45px); }
+.shop-wallet { color: #ffd68e !important; font-size: 15px; }
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(190px, 260px));
+  gap: 9px;
+  width: min(540px, 88vw);
+}
+
+.shop-grid button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 10px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.shop-grid button span { font-weight: 700; }
+.shop-grid button small { grid-column: 1; color: #9ba9be; }
+.shop-grid button b { grid-column: 2; grid-row: 1 / 3; align-self: center; color: #ffd68e; }
+.shop-grid button:disabled { opacity: .45; cursor: default; }
+.shop-grid button.owned { border-color: rgba(144, 237, 206, .5); background: rgba(81, 154, 130, .16); }
+.shop-grid button.owned b { color: #9af2d2; }
+.shop-message { min-height: 20px; color: #aab8ca !important; font-size: 12px; }
+.overlay .shop-close { margin-top: 0; padding-block: 9px; }
+
 #toast {
   position: absolute;
   left: 50%;
@@ -164,4 +199,6 @@ footer { margin-top: 15px; color: #56627b; text-align: center; font-size: 11px; 
 @media (max-width: 430px) {
   .touch-controls button { width: 48px; height: 48px; }
   .touch-group { gap: 5px; }
+  .shop-grid { grid-template-columns: 1fr; max-height: 260px; overflow-y: auto; }
+  .shop-grid button { padding-block: 8px; }
 }
