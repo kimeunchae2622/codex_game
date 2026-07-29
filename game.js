@@ -28,6 +28,8 @@ let toastTimer = 0;
 let soundOn = false;
 let audio;
 let platformHintShown = false;
+let animationFrameId = 0;
+let pausedSupport = null;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -372,11 +374,16 @@ addEventListener("keydown", e => {
     else if (e.code === "KeyZ") buyShopItem(shopButtons[shopSelection].dataset.shopItem);
     return;
   }
-  if (!keys.has(e.code)) taps.add(e.code);
+  const firstPress = !keys.has(e.code);
+  if (firstPress) taps.add(e.code);
   keys.add(e.code);
-  if (e.code === "Escape" && running) togglePause();
+  if (e.code === "Escape" && running && firstPress && !e.repeat) togglePause();
 });
 addEventListener("keyup", e => keys.delete(e.code));
+addEventListener("blur", () => {
+  keys.clear();
+  taps.clear();
+});
 
 document.querySelectorAll("[data-key]").forEach(button => {
   const code = button.dataset.key;
@@ -391,9 +398,8 @@ document.querySelectorAll("[data-key]").forEach(button => {
 document.querySelector("#startButton").addEventListener("click", () => {
   startScreen.classList.add("hidden");
   running = true;
-  last = performance.now();
   toast("방향키로 움직이고 Z로 점프하세요");
-  requestAnimationFrame(loop);
+  startGameLoop();
 });
 document.querySelector("#resumeButton").addEventListener("click", togglePause);
 document.querySelectorAll("[data-reset-game]").forEach(button => {
@@ -417,10 +423,45 @@ document.querySelector("#soundButton").addEventListener("click", e => {
   beep(520, .1, "sine", .06);
 });
 
+function findSupportingPlatform(tolerance = 7) {
+  const playerFeet = player.y + player.h;
+  const supports = [
+    ...platforms,
+    ...movingPlatforms,
+    ...crumblePlatforms.filter(platform => platform.gone <= 0)
+  ];
+  return supports.find(platform => {
+    const horizontallySupported = player.x + player.w > platform.x + 2
+      && player.x < platform.x + platform.w - 2;
+    return horizontallySupported && Math.abs(playerFeet - platform.y) <= tolerance;
+  }) || null;
+}
+
+function startGameLoop() {
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  last = performance.now();
+  animationFrameId = requestAnimationFrame(loop);
+}
+
 function togglePause() {
   paused = !paused;
   pauseScreen.classList.toggle("hidden", !paused);
-  if (!paused) { last = performance.now(); requestAnimationFrame(loop); }
+  if (paused) {
+    pausedSupport = findSupportingPlatform();
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = 0;
+  } else {
+    if (pausedSupport) {
+      player.y = pausedSupport.y - player.h;
+      player.vy = 0;
+      player.grounded = true;
+      player.coyote = .1;
+    }
+    pausedSupport = null;
+    keys.clear();
+    taps.clear();
+    startGameLoop();
+  }
 }
 
 function moveAndCollide(dt) {
@@ -1256,7 +1297,7 @@ function drawWorld() {
     ctx.stroke();
   }
   ctx.fillStyle = "rgba(194,232,211,.7)";
-  ctx.font = "12px system-ui";
+  ctx.font = "bold 16px system-ui";
   ctx.fillText("↑  빛의 수관", 3415, 330);
   ctx.fillStyle = "rgba(202,174,224,.72)";
   ctx.fillText("↓  가라앉은 뿌리", 2815, 446);
@@ -1294,10 +1335,10 @@ function drawWorld() {
     ctx.stroke();
   }
   ctx.fillStyle = "rgba(255,229,150,.78)";
-  ctx.font = "bold 15px system-ui";
+  ctx.font = "bold 20px system-ui";
   ctx.fillText("달빛 시계탑", 3995, -875);
   ctx.fillStyle = "rgba(255,236,178,.62)";
-  ctx.font = "11px system-ui";
+  ctx.font = "15px system-ui";
   ctx.fillText("수관 너머, 멈춘 달의 시간이 흐르는 곳", 3995, -856);
   ctx.restore();
 
@@ -1326,10 +1367,10 @@ function drawWorld() {
     }
   }
   ctx.fillStyle = "rgba(122,235,220,.82)";
-  ctx.font = "bold 15px system-ui";
+  ctx.font = "bold 20px system-ui";
   ctx.fillText("침수된 기록고", 4020, 1160);
   ctx.fillStyle = "rgba(160,224,220,.62)";
-  ctx.font = "11px system-ui";
+  ctx.font = "15px system-ui";
   ctx.fillText("뿌리 아래, 잊힌 문장이 물속을 떠도는 곳", 4020, 1178);
   ctx.restore();
 
@@ -1476,10 +1517,10 @@ function drawWorld() {
   ctx.restore();
   if (Math.abs(player.x + player.w / 2 - (merchant.x + merchant.w / 2)) < 70 && player.y > 375) {
     ctx.fillStyle = "rgba(7,10,18,.82)";
-    ctx.fillRect(merchant.x - 52, merchant.y - 35, 138, 24);
+    ctx.fillRect(merchant.x - 60, merchant.y - 40, 160, 30);
     ctx.fillStyle = "#ffe1a3";
-    ctx.font = "12px system-ui";
-    ctx.fillText("↓ 상점 열기", merchant.x - 12, merchant.y - 19);
+    ctx.font = "bold 15px system-ui";
+    ctx.fillText("↓ 상점 열기", merchant.x - 16, merchant.y - 20);
   }
 
   enemies.forEach(drawEnemy);
@@ -1499,7 +1540,7 @@ function drawWorld() {
       ctx.fill();
     }
     ctx.fillStyle = "#fff0b0";
-    ctx.font = "bold 11px system-ui";
+    ctx.font = "bold 14px system-ui";
     ctx.textAlign = "center";
     ctx.fillText(`${lost.amount} ◈`, 0, -19);
     ctx.restore();
@@ -1770,8 +1811,8 @@ function drawHUD() {
     ctx.beginPath(); ctx.moveTo(28 + i * 25, 24); ctx.quadraticCurveTo(38 + i * 25, 12, 48 + i * 25, 24); ctx.quadraticCurveTo(38 + i * 25, 39, 28 + i * 25, 24); ctx.fill();
   }
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(5,9,18,.65)"; ctx.fillRect(W - 164, 18, 140, 34);
-  ctx.fillStyle = "#bcd2e5"; ctx.font = "12px system-ui"; ctx.fillText(`메아리  ${save.echoes.length} / 3`, W - 145, 39);
+  ctx.fillStyle = "rgba(5,9,18,.65)"; ctx.fillRect(W - 194, 16, 170, 40);
+  ctx.fillStyle = "#bcd2e5"; ctx.font = "bold 15px system-ui"; ctx.fillText(`메아리  ${save.echoes.length} / 3`, W - 177, 42);
   for (let i = 0; i < 3; i++) {
     ctx.strokeStyle = i < save.echoes.length ? "#b6f0ff" : "#536076";
     ctx.strokeRect(W - 67 + i * 14, 29, 7, 7);
@@ -1785,19 +1826,19 @@ function drawHUD() {
         : player.x < 3000 ? "빗물의 뿌리"
           : player.x < 4050 ? "별 없는 온실"
             : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
-  ctx.textAlign = "center"; ctx.fillStyle = "rgba(213,232,248,.65)"; ctx.font = "12px Georgia, serif"; ctx.fillText(room, W / 2, 31);
+  ctx.textAlign = "center"; ctx.fillStyle = "rgba(225,239,250,.82)"; ctx.font = "bold 16px Georgia, serif"; ctx.fillText(room, W / 2, 32);
   const explored = save.echoes.length + save.shopItems.length
     + save.areaBosses.length + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
-  ctx.font = "10px system-ui";
-  ctx.fillStyle = "rgba(159,183,204,.55)";
-  ctx.fillText(`세계 탐색도 ${Math.round(explored / 11 * 100)}%`, W / 2, 47);
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(177,200,219,.72)";
+  ctx.fillText(`세계 탐색도 ${Math.round(explored / 11 * 100)}%`, W / 2, 51);
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(5,9,18,.7)";
-  ctx.fillRect(27, 66, 92, 27);
+  ctx.fillRect(27, 66, 104, 32);
   ctx.fillStyle = "#ffd477";
-  ctx.font = "bold 12px system-ui";
-  ctx.fillText(`◈  ${save.coins}`, 40, 84);
+  ctx.font = "bold 15px system-ui";
+  ctx.fillText(`◈  ${save.coins}`, 40, 88);
 
   if (save.dash) {
     ctx.textAlign = "left"; ctx.fillStyle = player.dashCool <= 0 ? "#a99cff" : "#39405b";
@@ -1819,14 +1860,14 @@ function drawHUD() {
         ? "#e6c75f"
         : "#70d5cd";
     ctx.fillRect(x, y, bw * activeBoss.hp / activeBoss.maxHp, 7);
-    ctx.fillStyle = "#d9d4ea"; ctx.font = "11px system-ui";
+    ctx.fillStyle = "#d9d4ea"; ctx.font = "bold 14px system-ui";
     ctx.fillText(activeBoss === boss ? "심연의 종지기"
       : activeBoss === midBoss ? "청록 수문장" : activeBoss.name, W / 2, y - 7);
   }
 
   if (save.relics.length) {
     ctx.textAlign = "right";
-    ctx.font = "11px system-ui";
+    ctx.font = "14px system-ui";
     ctx.fillStyle = "rgba(225,236,242,.72)";
     const relicNames = [
       save.relics.includes("moonGear") ? "⚙ 월륜 톱니" : "",
@@ -1868,13 +1909,14 @@ function win() {
 }
 
 function loop(now) {
+  animationFrameId = 0;
   if (!running || paused) return;
   const dt = Math.min((now - last) / 1000, .033);
   last = now;
   if (!shopOpen) update(dt);
   else taps.clear();
   render();
-  requestAnimationFrame(loop);
+  animationFrameId = requestAnimationFrame(loop);
 }
 
 render();
