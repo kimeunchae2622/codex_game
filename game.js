@@ -232,7 +232,7 @@ function resetEntities() {
       id: i, x: e[0], y, baseY: e[1], w: width, h: height, type: e[2], hp,
       dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7,
       patrolRange: e[3] ? 54 : 90, lastAttack: -1, cooldown: .7 + i % 4 * .28,
-      vx: 0, vy: 0, action: "idle", timer: 0
+      vx: 0, vy: 0, action: "idle", timer: 0, attackFired: false
     };
   });
   midBoss = {
@@ -752,29 +752,88 @@ function updateEnemies(dt) {
     if (e.dead) return;
     e.hit -= dt;
     e.cooldown -= dt;
+    e.timer -= dt;
+    const playerCenterX = player.x + player.w / 2;
+    const playerCenterY = player.y + player.h / 2;
+    const enemyCenterX = e.x + e.w / 2;
+    const enemyCenterY = e.y + e.h / 2;
+    const distanceToPlayer = Math.hypot(playerCenterX - enemyCenterX, playerCenterY - enemyCenterY);
+
     if (e.type === "crawler") {
-      e.x += e.dir * 55 * dt;
       const home = enemySeeds[e.id][0];
-      if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
+      if (e.action === "bite") {
+        if (e.timer > .22) {
+          e.x -= e.dir * 28 * dt;
+        } else {
+          e.x += e.dir * 245 * dt;
+        }
+        if (e.timer <= 0) e.action = "idle";
+      } else {
+        e.x += e.dir * 55 * dt;
+        if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
+        if (e.cooldown <= 0 && Math.abs(playerCenterX - enemyCenterX) < 135
+          && Math.abs(playerCenterY - enemyCenterY) < 70) {
+          e.dir = playerCenterX < enemyCenterX ? -1 : 1;
+          e.action = "bite";
+          e.timer = .48;
+          e.cooldown = 1.25;
+          puff(enemyCenterX, enemyCenterY, "#8faec1", 6, 65);
+        }
+      }
+      e.x = clamp(e.x, home - e.patrolRange - 18, home + e.patrolRange + 18);
     } else if (e.type === "flyer") {
       e.phase += dt * 2;
-      e.y = e.baseY + Math.sin(e.phase) * 28;
-      if (Math.abs(player.x - e.x) < 260) e.x += Math.sign(player.x - e.x) * 34 * dt;
+      if (e.action === "dive") {
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        e.vx *= Math.pow(.45, dt);
+        e.vy *= Math.pow(.45, dt);
+        if (e.timer <= 0) {
+          e.action = "idle";
+          e.baseY = e.y;
+        }
+      } else {
+        e.y = e.baseY + Math.sin(e.phase) * 28;
+        if (Math.abs(player.x - e.x) < 260) e.x += Math.sign(player.x - e.x) * 34 * dt;
+        if (e.cooldown <= 0 && distanceToPlayer < 210) {
+          const angle = Math.atan2(playerCenterY - enemyCenterY, playerCenterX - enemyCenterX);
+          e.dir = Math.cos(angle) < 0 ? -1 : 1;
+          e.vx = Math.cos(angle) * 275;
+          e.vy = Math.sin(angle) * 275;
+          e.action = "dive";
+          e.timer = .58;
+          e.cooldown = 1.45;
+          puff(enemyCenterX, enemyCenterY, "#8985ad", 8, 80);
+        }
+      }
     } else if (e.type === "clockwork") {
       e.phase += dt * 3.2;
       e.y = e.baseY + Math.sin(e.phase) * 18;
-      e.x += e.dir * 42 * dt;
       const home = enemySeeds[e.id][0];
-      if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
-      if (e.cooldown <= 0 && Math.hypot(player.x - e.x, player.y - e.y) < 390) {
-        fireAimedVolley(e, 2, .24, 210, "#f4d47b");
-        e.cooldown = 1.65;
-        beep(390, .09, "square", .025);
+      if (e.action === "cast") {
+        if (e.timer <= .18 && !e.attackFired) {
+          e.attackFired = true;
+          fireAimedVolley(e, 2, .24, 210, "#f4d47b");
+          beep(390, .09, "square", .025);
+        }
+        if (e.timer <= 0) {
+          e.action = "idle";
+          e.cooldown = 1.45;
+        }
+      } else {
+        e.x += e.dir * 42 * dt;
+        if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
+        if (e.cooldown <= 0 && distanceToPlayer < 390) {
+          e.dir = playerCenterX < enemyCenterX ? -1 : 1;
+          e.action = "cast";
+          e.timer = .42;
+          e.attackFired = false;
+          puff(enemyCenterX, enemyCenterY, "#f4d47b", 10, 90);
+        }
       }
     } else if (e.type === "inkling") {
       e.phase += dt * 2.5;
       if (e.action === "lunge") {
-        e.timer -= dt;
         e.x += e.vx * dt;
         e.y += e.vy * dt;
         e.vx *= Math.pow(.22, dt);
@@ -785,8 +844,9 @@ function updateEnemies(dt) {
         }
       } else {
         e.y = e.baseY + Math.sin(e.phase) * 20;
-        if (e.cooldown <= 0 && Math.hypot(player.x - e.x, player.y - e.y) < 320) {
-          const angle = Math.atan2(player.y - e.y, player.x - e.x);
+        if (e.cooldown <= 0 && distanceToPlayer < 320) {
+          const angle = Math.atan2(playerCenterY - enemyCenterY, playerCenterX - enemyCenterX);
+          e.dir = Math.cos(angle) < 0 ? -1 : 1;
           e.vx = Math.cos(angle) * 270;
           e.vy = Math.sin(angle) * 270;
           e.action = "lunge";
@@ -1608,6 +1668,20 @@ function drawWorld() {
 function drawEnemy(e) {
   if (e.dead) return;
   ctx.save(); ctx.translate(e.x + e.w / 2, e.y + e.h / 2);
+  if (e.action === "bite") {
+    const lunging = e.timer <= .22;
+    ctx.scale(lunging ? 1.28 : .86, lunging ? .8 : 1.18);
+    ctx.rotate(e.dir * (lunging ? .12 : -.08));
+  } else if (e.action === "dive") {
+    ctx.rotate(Math.atan2(e.vy, e.vx));
+    ctx.scale(1.3, .76);
+  } else if (e.action === "cast") {
+    const pulse = 1 + Math.sin(time * 24) * .09;
+    ctx.scale(pulse, pulse);
+  } else if (e.action === "lunge") {
+    ctx.rotate(Math.atan2(e.vy, e.vx));
+    ctx.scale(1.25, .78);
+  }
   if (e.hit > 0) ctx.globalAlpha = .55;
   ctx.fillStyle = e.type === "clockwork" ? "#6d5c3c"
     : e.type === "inkling" ? "#174b50"
@@ -1615,7 +1689,11 @@ function drawEnemy(e) {
   ctx.beginPath(); ctx.ellipse(0, 2, e.w / 2, e.h / 2, 0, 0, Math.PI * 2); ctx.fill();
   if (e.type === "flyer") {
     ctx.fillStyle = "#363b59";
-    ctx.beginPath(); ctx.ellipse(-18, -2, 15, 7, -.4, 0, Math.PI * 2); ctx.ellipse(18, -2, 15, 7, .4, 0, Math.PI * 2); ctx.fill();
+    const wingTilt = e.action === "dive" ? .12 : .4;
+    ctx.beginPath();
+    ctx.ellipse(-18, -2, 15, 7, -wingTilt, 0, Math.PI * 2);
+    ctx.ellipse(18, -2, 15, 7, wingTilt, 0, Math.PI * 2);
+    ctx.fill();
   } else if (e.type === "clockwork") {
     ctx.strokeStyle = "#e7c969";
     ctx.lineWidth = 3;
@@ -1629,6 +1707,13 @@ function drawEnemy(e) {
     ctx.beginPath();
     ctx.arc(0, 2, 11, 0, Math.PI * 2);
     ctx.stroke();
+    if (e.action === "cast") {
+      ctx.strokeStyle = "rgba(255,232,143,.78)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 2, 30 + Math.sin(time * 20) * 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   } else if (e.type === "inkling") {
     ctx.fillStyle = "rgba(91,218,205,.5)";
     for (let i = -1; i <= 1; i++) {
@@ -1641,6 +1726,14 @@ function drawEnemy(e) {
     ctx.beginPath();
     ctx.arc(0, -1, 14, Math.PI, Math.PI * 2);
     ctx.stroke();
+  } else if (e.action === "bite") {
+    ctx.fillStyle = "#172535";
+    ctx.beginPath();
+    ctx.moveTo(e.dir * 11, 2);
+    ctx.lineTo(e.dir * 22, -7);
+    ctx.lineTo(e.dir * 22, 11);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.fillStyle = e.type === "clockwork" ? "#fff0a9" : e.type === "inkling" ? "#9ffff1" : "#aeeaff";
   ctx.shadowColor = e.type === "clockwork" ? "#e4bc45" : e.type === "inkling" ? "#57d9ce" : "#86dfff";
