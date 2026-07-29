@@ -21,7 +21,7 @@ const inventoryMessageEl = document.querySelector("#inventoryMessage");
 const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
-const WORLD_W = 6200;
+const WORLD_W = 8600;
 const WORLD_TOP = -1370;
 const WORLD_BOTTOM = 1450;
 const FLOOR = 475;
@@ -58,7 +58,8 @@ const saveDefault = {
   checkpointY: 380, coins: 0, lostCoins: null, shopItems: [], opened: false,
   midBossDefeated: false, areaBosses: [], relics: [],
   ownedSigils: [], equippedSigils: [], sigilSlots: 3,
-  slotUpgrades: [], slotRewards: []
+  slotUpgrades: [], slotRewards: [],
+  bellBossDefeated: false, resonance: false, forgeHeart: false, endingSeen: false
 };
 let save = loadSave();
 
@@ -112,7 +113,7 @@ const equipmentCatalog = {
   weapon: { cost: 8, name: "새벽의 칼날", description: "기본 공격력 +1", type: "equipment" },
   armor: { cost: 10, name: "이끼 갑옷", description: "기본 최대 체력 +1", type: "equipment" },
   doubleJump: { cost: 12, name: "나방의 날개", description: "공중 점프 +1", type: "equipment" },
-  bellKey: { cost: 6, name: "종루의 열쇠", description: "최종 보스 관문을 여는 열쇠", type: "equipment" }
+  bellKey: { cost: 6, name: "종루의 열쇠", description: "심연의 종지기 관문을 여는 열쇠", type: "equipment" }
 };
 
 const gardenSigils = ["tideSigil", "thornMark", "mossHeart", "swiftRoot", "sharpPetal", "coinBloom", "quietStep", "longNeedle", "secondWind"];
@@ -132,22 +133,26 @@ function normalizeSave() {
     if (sigilCatalog[id] && !save.ownedSigils.includes(id)) save.ownedSigils.push(id);
   });
   const legacyRewards = [
-    [save.midBossDefeated, "wardenPulse", "midBoss"],
-    [save.areaBosses.includes("moonKeeper"), "moonGear", "moonKeeper"],
-    [save.areaBosses.includes("archiveKeeper"), "archiveCrown", "archiveKeeper"]
+    [save.midBossDefeated, "wardenPulse"],
+    [save.areaBosses.includes("moonKeeper"), "moonGear"],
+    [save.areaBosses.includes("archiveKeeper"), "archiveCrown"]
   ];
-  legacyRewards.forEach(([earned, sigilId, rewardId]) => {
+  legacyRewards.forEach(([earned, sigilId]) => {
     if (earned && !save.ownedSigils.includes(sigilId)) save.ownedSigils.push(sigilId);
-    if (earned && !save.slotRewards.includes(rewardId)) {
-      save.slotRewards.push(rewardId);
-      save.sigilSlots++;
-    }
   });
+  const balancedRewards = [];
+  if (save.areaBosses.includes("moonKeeper")) balancedRewards.push("moonKeeper");
+  if (save.bellBossDefeated) balancedRewards.push("bellWarden");
+  if (save.bellBossDefeated) save.resonance = true;
+  save.slotRewards = balancedRewards;
+  save.sigilSlots = 3 + save.slotUpgrades.length + balancedRewards.length;
   save.equippedSigils = save.equippedSigils.filter(id => save.ownedSigils.includes(id) && sigilCatalog[id]);
   let used = 0;
   save.equippedSigils = save.equippedSigils.filter(id => {
-    used += sigilCatalog[id].slots;
-    return used <= save.sigilSlots;
+    const cost = sigilCatalog[id].slots;
+    if (used + cost > save.sigilSlots) return false;
+    used += cost;
+    return true;
   });
   save.relics.forEach(id => {
     const sigil = sigilCatalog[id];
@@ -295,7 +300,41 @@ const platforms = [
   { x: 4140, y: 1090, w: 155, h: 18 },
   { x: 4410, y: 1030, w: 145, h: 18 },
   { x: 4680, y: 1085, w: 150, h: 18 },
-  { x: 4950, y: 1015, w: 155, h: 18 }
+  { x: 4950, y: 1015, w: 155, h: 18 },
+
+  // beyond the bell tower: ashen forge
+  { x: 6200, y: FLOOR, w: 420, h: 130 },
+  { x: 6710, y: FLOOR, w: 410, h: 130 },
+  { x: 7210, y: FLOOR, w: 620, h: 130 },
+  { x: 6300, y: 402, w: 135, h: 18 },
+  { x: 6500, y: 338, w: 145, h: 18 },
+  { x: 6740, y: 395, w: 130, h: 18 },
+  { x: 6950, y: 325, w: 145, h: 18 },
+  { x: 7180, y: 388, w: 140, h: 18 },
+  { x: 7440, y: 330, w: 155, h: 18 },
+
+  // forge descent into the sleeping coast
+  { x: 7660, y: 545, w: 150, h: 18 },
+  { x: 7460, y: 645, w: 140, h: 18 },
+  { x: 7640, y: 745, w: 145, h: 18 },
+  { x: 7440, y: 845, w: 145, h: 18 },
+  { x: 7610, y: 945, w: 155, h: 18 },
+  { x: 7410, y: 1045, w: 150, h: 18 },
+
+  // sleeping coast and its loop back to the flooded archive
+  { x: 5290, y: 1190, w: 590, h: 190 },
+  { x: 5980, y: 1190, w: 520, h: 190 },
+  { x: 6600, y: 1190, w: 420, h: 190 },
+  { x: 7120, y: 1190, w: 500, h: 190 },
+  { x: 7720, y: 1190, w: 880, h: 190 },
+  { x: 5480, y: 1090, w: 150, h: 18 },
+  { x: 5750, y: 1030, w: 145, h: 18 },
+  { x: 6100, y: 1090, w: 150, h: 18 },
+  { x: 6380, y: 1020, w: 155, h: 18 },
+  { x: 6780, y: 1080, w: 145, h: 18 },
+  { x: 7060, y: 1015, w: 150, h: 18 },
+  { x: 7930, y: 1080, w: 145, h: 18 },
+  { x: 8230, y: 1020, w: 155, h: 18 }
 ];
 
 const movingPlatforms = [
@@ -304,7 +343,9 @@ const movingPlatforms = [
   { x: 2910, y: 382, w: 90, h: 16, baseX: 2910, baseY: 382, axis: "y", range: 45, speed: 1.4, phase: 3.1, dx: 0, dy: 0, moving: true },
   { x: 3992, y: 365, w: 100, h: 16, baseX: 3992, baseY: 365, axis: "x", range: 70, speed: 1.15, phase: 4.4, dx: 0, dy: 0, moving: true },
   { x: 5095, y: 395, w: 105, h: 16, baseX: 5095, baseY: 395, axis: "y", range: 38, speed: 1.3, phase: 2.2, dx: 0, dy: 0, moving: true },
-  { x: 2913, y: 565, w: 84, h: 16, baseX: 2913, baseY: 565, axis: "y", range: 100, speed: .72, phase: 1.4, dx: 0, dy: 0, moving: true }
+  { x: 2913, y: 565, w: 84, h: 16, baseX: 2913, baseY: 565, axis: "y", range: 100, speed: .72, phase: 1.4, dx: 0, dy: 0, moving: true },
+  { x: 6615, y: 380, w: 92, h: 16, baseX: 6615, baseY: 380, axis: "y", range: 58, speed: 1.35, phase: .5, dx: 0, dy: 0, moving: true },
+  { x: 6505, y: 1080, w: 92, h: 16, baseX: 6505, baseY: 1080, axis: "x", range: 70, speed: .82, phase: 2.4, dx: 0, dy: 0, moving: true }
 ];
 
 const crumblePlatforms = [
@@ -322,12 +363,17 @@ const spikes = [
   { x: 3990, y: 455, w: 100, h: 20 }, { x: 5100, y: 455, w: 100, h: 20 },
   { x: 2900, y: 940, w: 100, h: 20 },
   { x: 4570, y: -1080, w: 85, h: 20 },
-  { x: 4320, y: 1170, w: 80, h: 20 }
+  { x: 4320, y: 1170, w: 80, h: 20 },
+  { x: 6620, y: 455, w: 90, h: 20 },
+  { x: 7120, y: 455, w: 90, h: 20 },
+  { x: 6500, y: 1170, w: 100, h: 20 },
+  { x: 7620, y: 1170, w: 100, h: 20 }
 ];
 
 const checkpointData = [
   { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 },
-  { x: 4010, y: -845 }, { x: 4410, y: -1060 }, { x: 4080, y: 1190 }
+  { x: 4010, y: -845 }, { x: 4410, y: -1060 }, { x: 4080, y: 1190 },
+  { x: 6360, y: 475 }, { x: 7480, y: 475 }, { x: 7810, y: 1190 }, { x: 5580, y: 1190 }
 ];
 
 const echoes = [
@@ -347,7 +393,11 @@ const enemySeeds = [
   [2600, 648, "crawler", true], [3080, 648, "crawler", true],
   [2820, 745, "flyer", true], [3390, 793, "crawler", true],
   [4590, -1115, "clockwork", true], [4770, -1125, "clockwork", true],
-  [4240, 1110, "inkling", true], [4570, 1070, "inkling", true]
+  [4240, 1110, "inkling", true], [4570, 1070, "inkling", true],
+  [6330, 370, "emberling", true], [6770, 360, "emberling", true],
+  [7040, 292, "emberling", true], [7460, 298, "emberling", true],
+  [5550, 1050, "starling", true], [6150, 1050, "starling", true],
+  [6860, 1035, "starling", true], [8000, 1040, "starling", true]
 ];
 let enemies = [];
 let midBoss = null;
@@ -367,10 +417,10 @@ function getMaxHp() {
 
 function resetEntities() {
   enemies = enemySeeds.map((e, i) => {
-    const flying = e[2] === "flyer" || e[2] === "clockwork" || e[2] === "inkling";
-    const width = e[2] === "clockwork" ? 42 : e[2] === "inkling" ? 40 : flying ? 34 : 38;
-    const height = e[2] === "clockwork" ? 36 : e[2] === "inkling" ? 38 : flying ? 28 : 32;
-    const hp = e[2] === "clockwork" ? 4 : e[2] === "inkling" ? 5 : flying ? 2 : 3;
+    const flying = ["flyer", "clockwork", "inkling", "starling"].includes(e[2]);
+    const width = e[2] === "clockwork" ? 42 : e[2] === "inkling" ? 40 : e[2] === "emberling" ? 44 : e[2] === "starling" ? 38 : flying ? 34 : 38;
+    const height = e[2] === "clockwork" ? 36 : e[2] === "inkling" ? 38 : e[2] === "emberling" ? 35 : e[2] === "starling" ? 32 : flying ? 28 : 32;
+    const hp = e[2] === "emberling" ? 6 : e[2] === "starling" ? 5 : e[2] === "clockwork" ? 4 : e[2] === "inkling" ? 5 : flying ? 2 : 3;
     const y = flying ? e[1] : (e[3] ? e[1] : supportTopAt(e[0], e[1] + height) - height);
     return {
       id: i, x: e[0], y, baseY: e[1], w: width, h: height, type: e[2], hp,
@@ -386,7 +436,7 @@ function resetEntities() {
   };
   boss = {
     x: 5700, y: 367, w: 82, h: 108, hp: 30, maxHp: 30, dir: -1,
-    active: false, dead: false, hit: 0, cooldown: 1, action: "idle",
+    active: false, dead: save.bellBossDefeated, hit: 0, cooldown: 1, action: "idle",
     timer: 0, cycle: 0, vx: 0, vy: 0, lastAttack: -1
   };
   areaBosses = [
@@ -401,6 +451,18 @@ function resetEntities() {
       x: 4780, y: 1100, baseY: 1100, w: 76, h: 90, hp: 18, maxHp: 18,
       active: false, dead: save.areaBosses.includes("archiveKeeper"), hit: 0,
       cooldown: .9, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
+    },
+    {
+      id: "forgeCore", kind: "forge", name: "잿불 제련심장",
+      x: 7380, y: 383, baseY: 383, w: 84, h: 92, hp: 24, maxHp: 24,
+      active: false, dead: save.areaBosses.includes("forgeCore"), hit: 0,
+      cooldown: .75, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
+    },
+    {
+      id: "starDevourer", kind: "coast", name: "별잠 포식자",
+      x: 8180, y: 1092, baseY: 1092, w: 86, h: 98, hp: 28, maxHp: 28,
+      active: false, dead: save.areaBosses.includes("starDevourer"), hit: 0,
+      cooldown: .72, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     }
   ];
   coinDrops.length = 0;
@@ -561,7 +623,9 @@ function equipmentRows() {
     ["armor", "이끼 갑옷", "최대 체력 +1"],
     ["doubleJump", "나방의 날개", "공중 점프 +1"],
     ["bellKey", "종루의 열쇠", "최종 관문 개방"],
-    ["dash", "그림자 대시", "C로 빠르게 돌진"]
+    ["dash", "그림자 대시", "C로 빠르게 돌진"],
+    ["resonance", "종의 공명", "정원 밖 공명문 개방"],
+    ["forgeHeart", "용광로 내성", "타오르는 봉인 통과"]
   ];
 }
 
@@ -572,7 +636,9 @@ function renderInventory(message = "방향키로 선택 · Z 장착/해제 · I 
   sigilSlotPipsEl.innerHTML = Array.from({ length: save.sigilSlots }, (_, i) =>
     `<i class="${i < used ? "used" : ""}"></i>`).join("");
   equipmentListEl.innerHTML = equipmentRows().map(([id, name, description]) => {
-    const owned = id === "dash" ? save.dash : save.shopItems.includes(id);
+    const owned = id === "dash" ? save.dash
+      : id === "resonance" ? save.resonance
+        : id === "forgeHeart" ? save.forgeHeart : save.shopItems.includes(id);
     return `<div class="${owned ? "owned" : ""}"><b>${owned ? "◆" : "◇"} ${name}</b><br><small>${owned ? description : "아직 발견하지 못함"}</small></div>`;
   }).join("");
 
@@ -798,6 +864,11 @@ function moveAndCollide(dt) {
   if (!save.opened) solids.push({ x: 3978, y: 150, w: 34, h: 325, gate: "echo" });
   if (!save.midBossDefeated) solids.push({ x: 4620, y: 130, w: 38, h: 345, gate: "midboss" });
   if (!save.shopItems.includes("bellKey")) solids.push({ x: 5155, y: 130, w: 38, h: 345, gate: "boss" });
+  if (!save.resonance) solids.push({ x: 6190, y: 130, w: 40, h: 345, gate: "resonance" });
+  if (!save.forgeHeart) {
+    solids.push({ x: 7580, y: 130, w: 40, h: 345, gate: "forge" });
+    solids.push({ x: 5880, y: 960, w: 40, h: 230, gate: "forgeShortcut" });
+  }
   for (const p of solids) {
     if (!overlap(player, p)) continue;
     if (player.vx > 0) player.x = p.x - player.w;
@@ -805,7 +876,9 @@ function moveAndCollide(dt) {
     player.vx = 0;
     if (p.gate === "echo" && save.echoes.length < 3) toast(`침묵의 문 · 메아리 ${save.echoes.length}/3`);
     if (p.gate === "midboss") toast("수문장이 길을 막고 있습니다 · 중간 보스를 처치하세요");
-    if (p.gate === "boss") toast("종루의 최종 관문 · 상점에서 종루의 열쇠를 준비하세요");
+    if (p.gate === "boss") toast("심연의 종지기 관문 · 상점에서 종루의 열쇠를 준비하세요");
+    if (p.gate === "resonance") toast("잠든 공명문 · 심연의 종지기를 쓰러뜨려야 합니다");
+    if (p.gate === "forge" || p.gate === "forgeShortcut") toast("타오르는 봉인 · 잿불 제련심장을 쓰러뜨리세요");
   }
 
   player.grounded = false;
@@ -840,7 +913,7 @@ function moveAndCollide(dt) {
 }
 
 function hurt(amount, sourceX) {
-  if (player.inv > 0 || player.respawning > 0 || boss?.dead) return;
+  if (player.inv > 0 || player.respawning > 0) return;
   player.hp -= amount;
   player.inv = 1.15 + sigilStats().invulnerability;
   player.vx = player.x < sourceX ? -310 : 310;
@@ -1094,7 +1167,7 @@ function updateEnemies(dt) {
     const enemyCenterY = e.y + e.h / 2;
     const distanceToPlayer = Math.hypot(playerCenterX - enemyCenterX, playerCenterY - enemyCenterY);
 
-    if (e.type === "crawler") {
+    if (e.type === "crawler" || e.type === "emberling") {
       const home = enemySeeds[e.id][0];
       if (e.action === "bite") {
         if (e.timer > .22) {
@@ -1112,11 +1185,11 @@ function updateEnemies(dt) {
           e.action = "bite";
           e.timer = .48;
           e.cooldown = 1.25;
-          puff(enemyCenterX, enemyCenterY, "#8faec1", 6, 65);
+          puff(enemyCenterX, enemyCenterY, e.type === "emberling" ? "#ff8b4a" : "#8faec1", 6, 65);
         }
       }
       e.x = clamp(e.x, home - e.patrolRange - 18, home + e.patrolRange + 18);
-    } else if (e.type === "flyer") {
+    } else if (e.type === "flyer" || e.type === "starling") {
       e.phase += dt * 2;
       if (e.action === "dive") {
         e.x += e.vx * dt;
@@ -1138,7 +1211,7 @@ function updateEnemies(dt) {
           e.action = "dive";
           e.timer = .58;
           e.cooldown = 1.45;
-          puff(enemyCenterX, enemyCenterY, "#8985ad", 8, 80);
+          puff(enemyCenterX, enemyCenterY, e.type === "starling" ? "#8bdcff" : "#8985ad", 8, 80);
         }
       }
     } else if (e.type === "clockwork") {
@@ -1201,7 +1274,7 @@ function updateEnemies(dt) {
       e.lastAttack = player.attackId;
       e.hp -= attackPower;
       e.hit = .18;
-      e.knockback = knockDirection * (e.type === "clockwork" || e.type === "inkling" ? 235 : 195);
+      e.knockback = knockDirection * (["clockwork", "inkling", "emberling", "starling"].includes(e.type) ? 235 : 195);
       bounceFromDownwardHit(e);
       shake = 4;
       puff(e.x + e.w / 2 - knockDirection * 8, e.y + e.h / 2, "#baf0ff", 11, 165);
@@ -1210,9 +1283,13 @@ function updateEnemies(dt) {
         e.dead = true;
         if (!save.defeated.includes(e.id)) save.defeated.push(e.id);
         storeSave();
-        const regionalEnemy = e.type === "clockwork" || e.type === "inkling";
+        const regionalEnemy = ["clockwork", "inkling", "emberling", "starling"].includes(e.type);
         spawnCoins(e.x + e.w / 2, e.y + e.h / 2, regionalEnemy ? 6 : e.type === "flyer" ? 4 : 3);
-        puff(e.x, e.y, e.type === "clockwork" ? "#e8c66c" : e.type === "inkling" ? "#67d9c8" : "#7186a8", 18, 180);
+        const deathColor = e.type === "clockwork" ? "#e8c66c"
+          : e.type === "inkling" ? "#67d9c8"
+            : e.type === "emberling" ? "#ff7d3f"
+              : e.type === "starling" ? "#82dfff" : "#7186a8";
+        puff(e.x, e.y, deathColor, 18, 180);
       }
     }
     if (overlap(player, e)) hurt(1, e.x + e.w / 2);
@@ -1432,7 +1509,7 @@ function updateMidBoss(dt) {
       spawnCoins(midBoss.x + midBoss.w / 2, midBoss.y + midBoss.h / 2, 12);
       shake = 20;
       puff(midBoss.x + 30, midBoss.y + 35, "#b9fff1", 55, 290);
-      toast("수문장 격파 · 수문장의 맥동과 인장 슬롯 +1 획득", 4200);
+      toast("수문장 격파 · 전용 인장 「수문장의 맥동」 획득", 4200);
     }
   }
   if (overlap(player, midBoss)) hurt(1, midBoss.x + midBoss.w / 2);
@@ -1449,23 +1526,36 @@ function defeatAreaBoss(areaBoss) {
   areaBoss.dead = true;
   areaBoss.active = false;
   if (!save.areaBosses.includes(areaBoss.id)) save.areaBosses.push(areaBoss.id);
-  const relic = areaBoss.kind === "moon" ? "moonGear" : "archiveCrown";
-  grantBossSigil(areaBoss.id, relic);
+  if (areaBoss.kind === "moon") {
+    grantBossSigil(areaBoss.id, "moonGear", true);
+  } else if (areaBoss.kind === "archive") {
+    grantBossSigil(areaBoss.id, "archiveCrown");
+  } else if (areaBoss.kind === "forge") {
+    save.forgeHeart = true;
+  }
   storeSave();
-  spawnCoins(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, 16);
+  spawnCoins(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2,
+    areaBoss.kind === "coast" ? 24 : areaBoss.kind === "forge" ? 20 : 16);
   bossProjectiles.length = 0;
   shake = 24;
-  const color = areaBoss.kind === "moon" ? "#f5d77a" : "#68dfd0";
+  const color = areaBoss.kind === "moon" ? "#f5d77a"
+    : areaBoss.kind === "archive" ? "#68dfd0"
+      : areaBoss.kind === "forge" ? "#ff7548" : "#8edcff";
   puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, color, 65, 310);
-  toast(areaBoss.kind === "moon"
-    ? "월륜의 파수꾼 격파 · 월륜 톱니와 인장 슬롯 +1 획득"
-    : "먹빛 사서 격파 · 기록고의 왕관과 인장 슬롯 +1 획득", 4400);
-  beep(areaBoss.kind === "moon" ? 760 : 560, .8, "sine", .065);
+  const messages = {
+    moon: "월륜의 파수꾼 격파 · 월륜 톱니와 인장 슬롯 +1 획득",
+    archive: "먹빛 사서 격파 · 전용 인장 「기록고의 왕관」 획득",
+    forge: "잿불 제련심장 격파 · 용광로 내성 획득 · 별잠 해안의 봉인 해제",
+    coast: "별잠 포식자 격파 · 정원 밖의 모든 길이 하나로 이어졌습니다"
+  };
+  toast(messages[areaBoss.kind], 4600);
+  beep(areaBoss.kind === "moon" ? 760 : areaBoss.kind === "forge" ? 310 : 560, .8, "sine", .065);
+  if (areaBoss.kind === "coast") setTimeout(win, 1100);
 }
 
-function grantBossSigil(rewardId, sigilId) {
+function grantBossSigil(rewardId, sigilId, grantsSlot = false) {
   if (!save.ownedSigils.includes(sigilId)) save.ownedSigils.push(sigilId);
-  if (!save.slotRewards.includes(rewardId)) {
+  if (grantsSlot && !save.slotRewards.includes(rewardId)) {
     save.slotRewards.push(rewardId);
     save.sigilSlots++;
   }
@@ -1483,7 +1573,11 @@ function updateAreaBosses(dt) {
     if (areaBoss.dead) return;
     const insideRegion = areaBoss.kind === "moon"
       ? player.y < -920 && player.x > 4650
-      : player.y > 1000 && player.x > 4400;
+      : areaBoss.kind === "archive"
+        ? player.y > 1000 && player.x > 4400 && player.x < 5200
+        : areaBoss.kind === "forge"
+          ? save.resonance && player.y < 600 && player.x > 7000
+          : save.forgeHeart && player.y > 980 && player.x > 7800;
     if (insideRegion) areaBoss.active = true;
     if (!areaBoss.active) return;
 
@@ -1517,15 +1611,23 @@ function updateAreaBosses(dt) {
         }
       }
     } else {
+      const groundY = areaBoss.kind === "forge" ? FLOOR : 1190;
+      const bounds = areaBoss.kind === "archive"
+        ? [4420, 5080]
+        : areaBoss.kind === "forge"
+          ? [7040, 7540]
+          : [7820, 8480];
+      const attackColor = areaBoss.kind === "archive" ? "#69d8ca"
+        : areaBoss.kind === "forge" ? "#ff7548" : "#86d7ff";
       areaBoss.vy += 1280 * dt;
       areaBoss.x += areaBoss.vx * dt;
       areaBoss.y += areaBoss.vy * dt;
-      const landed = areaBoss.y + areaBoss.h >= 1190 && areaBoss.vy > 80;
-      if (areaBoss.y + areaBoss.h >= 1190) {
-        areaBoss.y = 1190 - areaBoss.h;
+      const landed = areaBoss.y + areaBoss.h >= groundY && areaBoss.vy > 80;
+      if (areaBoss.y + areaBoss.h >= groundY) {
+        areaBoss.y = groundY - areaBoss.h;
         areaBoss.vy = 0;
       }
-      areaBoss.x = clamp(areaBoss.x, 4420, 5080);
+      areaBoss.x = clamp(areaBoss.x, bounds[0], bounds[1]);
 
       if (areaBoss.action === "charge") {
         areaBoss.vx = areaBoss.dir * 310;
@@ -1536,7 +1638,7 @@ function updateAreaBosses(dt) {
       } else if (areaBoss.action === "leap") {
         areaBoss.vx = areaBoss.dir * 105;
         if (landed && areaBoss.timer < 1.15) {
-          spawnGroundWavesAt(areaBoss.x + areaBoss.w / 2, 1190, "#69d8ca");
+          spawnGroundWavesAt(areaBoss.x + areaBoss.w / 2, groundY, attackColor);
           areaBoss.action = "idle";
           areaBoss.cooldown = .8;
         }
@@ -1552,7 +1654,9 @@ function updateAreaBosses(dt) {
             areaBoss.timer = 1.55;
             areaBoss.vy = -520;
           } else {
-            fireAimedVolley(areaBoss, 4, .75, 230, "#5ad3c5");
+            fireAimedVolley(areaBoss, areaBoss.kind === "coast" ? 6 : 4,
+              areaBoss.kind === "coast" ? 1.05 : .75,
+              areaBoss.kind === "forge" ? 270 : 230, attackColor);
             areaBoss.cooldown = .9;
           }
         }
@@ -1568,7 +1672,9 @@ function updateAreaBosses(dt) {
       bounceFromDownwardHit(areaBoss);
       shake = 6;
       puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2,
-        areaBoss.kind === "moon" ? "#f4d477" : "#67dbcf", 12, 170);
+        areaBoss.kind === "moon" ? "#f4d477"
+          : areaBoss.kind === "archive" ? "#67dbcf"
+            : areaBoss.kind === "forge" ? "#ff7548" : "#8bdcff", 12, 170);
       if (areaBoss.hp <= 0) defeatAreaBoss(areaBoss);
     }
     if (overlap(player, areaBoss)) hurt(1, areaBoss.x + areaBoss.w / 2);
@@ -1635,9 +1741,17 @@ function updateBoss(dt) {
     shake = 8; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 13, 180);
     if (boss.hp <= 0) {
       boss.dead = true; boss.active = false; boss.vx = 0;
+      save.bellBossDefeated = true;
+      save.resonance = true;
+      if (!save.slotRewards.includes("bellWarden")) {
+        save.slotRewards.push("bellWarden");
+        save.sigilSlots++;
+      }
+      storeSave();
       bossProjectiles.length = 0;
       shake = 28; puff(boss.x + 40, boss.y + 50, "#e7fbff", 95, 330);
-      setTimeout(win, 900);
+      toast("심연의 종지기 격파 · 종의 공명과 인장 슬롯 +1 획득 · 오른쪽 문이 열렸습니다", 5200);
+      beep(920, .9, "sine", .07);
     }
   }
   if (overlap(player, boss)) hurt(1, boss.x + boss.w / 2);
@@ -1669,9 +1783,15 @@ function roundRect(x, y, w, h, r) {
 
 function drawBackground() {
   const clocktower = player.y < -900;
-  const archive = player.y > 1000;
+  const forge = player.x >= 6100 && player.y < 800;
+  const coast = player.x >= 5200 && player.y >= 800;
+  const archive = player.y > 1000 && player.x < 5200;
   const palette = clocktower
     ? ["#11152c", "#0c1023", "#070918"]
+    : forge
+      ? ["#351b20", "#1d1118", "#0d0a0f"]
+      : coast
+        ? ["#132843", "#0b1c33", "#07101f"]
     : archive
       ? ["#071d25", "#07171e", "#040d13"]
       : ["#11182c", "#0b1321", "#070b12"];
@@ -1683,6 +1803,10 @@ function drawBackground() {
     const depth = .08 + layer * .09;
     ctx.fillStyle = clocktower
       ? [`#1b203c`, `#141a34`, `#0d1228`][layer]
+      : forge
+        ? [`#49252a`, `#2f1a21`, `#1b1017`][layer]
+        : coast
+          ? [`#1a3b59`, `#122d49`, `#0b2038`][layer]
       : archive
         ? [`#0d3036`, `#0a272e`, `#071c24`][layer]
         : [`#141d31`, `#101a2c`, `#0c1524`][layer];
@@ -1701,6 +1825,10 @@ function drawBackground() {
     if (sx < -5 || sx > W + 5) return;
     ctx.fillStyle = clocktower
       ? (m.depth > .5 ? "#ffe59a" : "#998cc7")
+      : forge
+        ? (m.depth > .5 ? "#ff9b55" : "#9e4f55")
+        : coast
+          ? (m.depth > .5 ? "#a7e8ff" : "#6e8fd0")
       : archive
         ? (m.depth > .5 ? "#79ead9" : "#498f9b")
         : (m.depth > .5 ? "#a7e9ff" : "#6e87b3");
@@ -1735,6 +1863,36 @@ function drawBackground() {
         ctx.fillRect(Math.round(x + Math.cos(angle) * 39 - 3), Math.round(y + Math.sin(angle) * 39 - 3), 6, 6);
       }
     }
+  } else if (forge) {
+    for (let x = -30 - (camera.x * .2 % 125); x < W + 80; x += 125) {
+      const height = 100 + ((x * 7) % 150);
+      ctx.fillStyle = "rgba(255,102,54,.08)";
+      ctx.fillRect(x, H - height, 45, height);
+      ctx.fillStyle = "rgba(255,155,74,.22)";
+      ctx.fillRect(x + 8, H - height - 12, 8, 12);
+      ctx.fillRect(x + 28, H - height - 20, 7, 20);
+    }
+    for (let i = 0; i < 25; i++) {
+      const x = (i * 91 + time * (18 + i % 4)) % W;
+      const y = H - ((i * 53 + time * 34) % H);
+      ctx.fillStyle = i % 2 ? "rgba(255,121,63,.45)" : "rgba(255,213,109,.35)";
+      ctx.fillRect(Math.round(x), Math.round(y), 3 + i % 3, 3 + i % 3);
+    }
+  } else if (coast) {
+    ctx.fillStyle = "rgba(151,214,255,.13)";
+    ctx.fillRect(0, H * .62, W, H * .38);
+    ctx.strokeStyle = "rgba(132,210,255,.2)";
+    for (let y = H * .65; y < H; y += 34) {
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 20) ctx.lineTo(x, y + Math.sin(x * .018 + time + y) * 6);
+      ctx.stroke();
+    }
+    for (let i = 0; i < 22; i++) {
+      const x = (i * 113 - camera.x * .04) % W;
+      const y = 70 + (i * 67 % 260);
+      ctx.fillStyle = `rgba(178,229,255,${.18 + i % 3 * .08})`;
+      ctx.fillRect(Math.round(x), y, i % 5 === 0 ? 6 : 3, i % 5 === 0 ? 6 : 3);
+    }
   } else if (archive) {
     for (let x = -60 - (camera.x * .12 % 190); x < W + 100; x += 190) {
       const beam = ctx.createLinearGradient(x, 0, x + 110, H);
@@ -1767,7 +1925,7 @@ function drawWorld() {
   ctx.translate(-camera.x, -camera.y);
 
   // distant bells and plants
-  for (let x = 180; x < WORLD_W; x += 430) {
+  for (let x = 180; x < 6200; x += 430) {
     ctx.strokeStyle = "#223553"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 115 + (x % 90)); ctx.stroke();
     ctx.fillStyle = "#182941"; ctx.beginPath(); ctx.ellipse(x, 130 + (x % 90), 25, 33, 0, 0, Math.PI * 2); ctx.fill();
@@ -1869,9 +2027,67 @@ function drawWorld() {
   ctx.fillText("뿌리 아래, 잊힌 문장이 물속을 떠도는 곳", 4020, 1178);
   ctx.restore();
 
+  // ashen forge
+  ctx.save();
+  ctx.fillStyle = "rgba(255,93,45,.08)";
+  ctx.fillRect(6180, 120, 1660, 430);
+  ctx.strokeStyle = "rgba(255,119,65,.3)";
+  ctx.lineWidth = 7;
+  for (let x = 6280; x < 7780; x += 190) {
+    ctx.strokeRect(x, 170, 72, 305);
+    ctx.beginPath();
+    ctx.moveTo(x + 36, 170);
+    ctx.lineTo(x + 36, 115 + Math.sin(time * 2 + x) * 12);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 34; i++) {
+    const emberX = 6200 + (i * 89) % 1580;
+    const emberY = 440 - ((i * 37 + time * (28 + i % 5)) % 310);
+    ctx.fillStyle = i % 3 ? "rgba(255,111,53,.55)" : "rgba(255,215,111,.65)";
+    ctx.fillRect(emberX, emberY, 3 + i % 3, 3 + i % 3);
+  }
+  ctx.fillStyle = "rgba(255,154,91,.86)";
+  ctx.font = "bold 20px system-ui";
+  ctx.fillText("잿빛 제련소", 6250, 455);
+  ctx.fillStyle = "rgba(244,179,140,.68)";
+  ctx.font = "15px system-ui";
+  ctx.fillText("종의 금속을 녹이던 불씨가 아직 숨 쉬는 곳", 6250, 473);
+  ctx.restore();
+
+  // sleeping coast and the archive loop
+  ctx.save();
+  ctx.fillStyle = "rgba(90,169,226,.09)";
+  ctx.fillRect(5200, 990, 3400, 460);
+  ctx.strokeStyle = "rgba(135,211,255,.24)";
+  ctx.lineWidth = 2;
+  for (let y = 1225; y < 1430; y += 38) {
+    ctx.beginPath();
+    for (let x = 5200; x <= 8600; x += 34) ctx.lineTo(x, y + Math.sin(x * .018 + time * 1.1 + y) * 7);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 30; i++) {
+    const starX = 5260 + (i * 127) % 3260;
+    const starY = 1000 + (i * 61) % 170 + Math.sin(time * .7 + i) * 10;
+    ctx.fillStyle = i % 4 ? "rgba(154,220,255,.38)" : "rgba(235,245,255,.7)";
+    ctx.fillRect(starX, starY, 4, 4);
+    if (i % 4 === 0) {
+      ctx.fillRect(starX - 4, starY + 1, 3, 2);
+      ctx.fillRect(starX + 5, starY + 1, 3, 2);
+    }
+  }
+  ctx.fillStyle = "rgba(169,224,255,.88)";
+  ctx.font = "bold 20px system-ui";
+  ctx.fillText("별잠 해안", 7750, 1160);
+  ctx.fillStyle = "rgba(179,215,239,.7)";
+  ctx.font = "15px system-ui";
+  ctx.fillText("잠든 별이 밀려오고, 기록고로 되돌아가는 바닷길", 7750, 1179);
+  ctx.fillStyle = "rgba(129,211,207,.72)";
+  ctx.fillText("← 침수된 기록고로 이어지는 순환 통로", 5350, 1160);
+  ctx.restore();
+
   // layered ornaments: luminous garden, canopy, roots, gears and drifting records
   ctx.save();
-  for (let x = 140; x < WORLD_W; x += 185) {
+  for (let x = 140; x < 6100; x += 185) {
     const groundY = supportTopAt(x, FLOOR);
     if (groundY < 300 || groundY > 500) continue;
     const sway = Math.sin(time * 1.7 + x * .013) * 5;
@@ -1954,16 +2170,24 @@ function drawWorld() {
 
   platforms.forEach(p => {
     const clockPlatform = p.y < -600;
-    const archivePlatform = p.y > 1000;
+    const forgePlatform = p.x >= 6100 && p.y < 800;
+    const coastPlatform = p.x >= 5200 && p.y >= 800;
+    const archivePlatform = p.y > 1000 && p.x < 5200;
     ctx.fillStyle = clockPlatform
       ? (p.h > 50 ? "#1c2138" : "#34364c")
+      : forgePlatform
+        ? (p.h > 50 ? "#2d1b1c" : "#51302b")
+        : coastPlatform
+          ? (p.h > 50 ? "#142d43" : "#264b65")
       : archivePlatform
         ? (p.h > 50 ? "#102b31" : "#21454a")
         : (p.h > 50 ? "#172333" : "#213046");
     ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = clockPlatform ? "#c6a95d" : archivePlatform ? "#4ca89f" : "#344a5e";
+    ctx.fillStyle = clockPlatform ? "#c6a95d" : forgePlatform ? "#e76f3f"
+      : coastPlatform ? "#6fbde3" : archivePlatform ? "#4ca89f" : "#344a5e";
     ctx.fillRect(p.x, p.y, p.w, 4);
-    ctx.strokeStyle = clockPlatform ? "#58506d" : archivePlatform ? "#183c43" : "#213448";
+    ctx.strokeStyle = clockPlatform ? "#58506d" : forgePlatform ? "#6b3027"
+      : coastPlatform ? "#1a3c58" : archivePlatform ? "#183c43" : "#213448";
     ctx.lineWidth = 2;
     for (let x = p.x + 18; x < p.x + p.w; x += 42) {
       ctx.beginPath();
@@ -2080,6 +2304,33 @@ function drawWorld() {
       ctx.lineTo(5163, y + 22);
       ctx.stroke();
     }
+  }
+
+  if (!save.resonance) {
+    ctx.fillStyle = "#17152a";
+    ctx.fillRect(6190, 130, 40, 345);
+    ctx.strokeStyle = "#a88cff";
+    ctx.lineWidth = 3;
+    for (let y = 160; y < 455; y += 52) {
+      ctx.beginPath();
+      ctx.arc(6210, y, 12 + Math.sin(time * 3 + y) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  if (!save.forgeHeart) {
+    [[7580, 130, 40, 345], [5880, 960, 40, 230]].forEach(([x, y, w, h]) => {
+      ctx.fillStyle = "#321b18";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "#ff7548";
+      ctx.lineWidth = 3;
+      for (let fy = y + 18; fy < y + h - 8; fy += 38) {
+        ctx.beginPath();
+        ctx.moveTo(x + 7, fy + 16);
+        ctx.quadraticCurveTo(x + w / 2, fy - 12 + Math.sin(time * 6 + fy) * 5, x + w - 7, fy + 16);
+        ctx.stroke();
+      }
+    });
   }
 
   // regional sigil merchants
@@ -2215,10 +2466,12 @@ function drawEnemy(e) {
   if (e.hit > 0) ctx.globalAlpha = .55;
   ctx.fillStyle = e.type === "clockwork" ? "#6d5c3c"
     : e.type === "inkling" ? "#174b50"
-      : e.type === "flyer" ? "#6f6b91" : "#45586a";
+      : e.type === "emberling" ? "#6d2d25"
+        : e.type === "starling" ? "#294b73"
+          : e.type === "flyer" ? "#6f6b91" : "#45586a";
   ctx.beginPath(); ctx.ellipse(0, 2, e.w / 2, e.h / 2, 0, 0, Math.PI * 2); ctx.fill();
-  if (e.type === "flyer") {
-    ctx.fillStyle = "#363b59";
+  if (e.type === "flyer" || e.type === "starling") {
+    ctx.fillStyle = e.type === "starling" ? "#3e75a0" : "#363b59";
     const wingTilt = e.action === "dive" ? .12 : .4;
     ctx.beginPath();
     ctx.ellipse(-18, -2, 15, 7, -wingTilt, 0, Math.PI * 2);
@@ -2256,6 +2509,21 @@ function drawEnemy(e) {
     ctx.beginPath();
     ctx.arc(0, -1, 14, Math.PI, Math.PI * 2);
     ctx.stroke();
+  } else if (e.type === "emberling") {
+    ctx.fillStyle = "#ff7548";
+    ctx.shadowColor = "#ff5b35";
+    ctx.shadowBlur = 13;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 8 - 5, -10);
+      ctx.lineTo(i * 8, -25 - Math.sin(time * 9 + i) * 5);
+      ctx.lineTo(i * 8 + 6, -9);
+      ctx.fill();
+    }
+    if (e.action === "bite") {
+      ctx.fillStyle = "#2a1010";
+      ctx.fillRect(e.dir * 12 - 5, -3, 16, 13);
+    }
   } else if (e.action === "bite") {
     ctx.fillStyle = "#172535";
     ctx.beginPath();
@@ -2265,8 +2533,13 @@ function drawEnemy(e) {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.fillStyle = e.type === "clockwork" ? "#fff0a9" : e.type === "inkling" ? "#9ffff1" : "#aeeaff";
-  ctx.shadowColor = e.type === "clockwork" ? "#e4bc45" : e.type === "inkling" ? "#57d9ce" : "#86dfff";
+  ctx.fillStyle = e.type === "clockwork" ? "#fff0a9"
+    : e.type === "inkling" ? "#9ffff1"
+      : e.type === "emberling" ? "#ffe09a"
+        : e.type === "starling" ? "#f1fbff" : "#aeeaff";
+  ctx.shadowColor = e.type === "clockwork" ? "#e4bc45"
+    : e.type === "inkling" ? "#57d9ce"
+      : e.type === "emberling" ? "#ff643c" : "#86dfff";
   ctx.shadowBlur = 8;
   ctx.beginPath(); ctx.arc(e.dir * 7, -3, 3, 0, Math.PI * 2); ctx.fill();
   ctx.restore(); ctx.shadowBlur = 0;
@@ -2305,7 +2578,7 @@ function drawAreaBoss(areaBoss) {
     ctx.beginPath();
     ctx.arc(8, -4, 5, 0, Math.PI * 2);
     ctx.fill();
-  } else {
+  } else if (areaBoss.kind === "archive") {
     ctx.shadowColor = "#54d5c8";
     ctx.shadowBlur = areaBoss.action === "leap" ? 25 : 14;
     ctx.fillStyle = "#173f45";
@@ -2329,6 +2602,49 @@ function drawAreaBoss(areaBoss) {
     ctx.arc(-8, -25, 4, 0, Math.PI * 2);
     ctx.arc(8, -25, 4, 0, Math.PI * 2);
     ctx.fill();
+  } else if (areaBoss.kind === "forge") {
+    ctx.shadowColor = "#ff673c";
+    ctx.shadowBlur = areaBoss.action === "leap" ? 32 : 19;
+    ctx.fillStyle = "#4c211f";
+    ctx.fillRect(-36, -30, 72, 70);
+    ctx.strokeStyle = "#ff7548";
+    ctx.lineWidth = 6;
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4 + time * .7;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 29, Math.sin(angle) * 29);
+      ctx.lineTo(Math.cos(angle) * 44, Math.sin(angle) * 44);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#ff9a55";
+    ctx.beginPath();
+    ctx.arc(0, 1, 22 + Math.sin(time * 8) * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff0ad";
+    ctx.fillRect(-7, -5, 14, 12);
+  } else {
+    ctx.shadowColor = "#87dfff";
+    ctx.shadowBlur = areaBoss.action === "charge" ? 30 : 18;
+    ctx.fillStyle = "#1c3b61";
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 40, 48, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#9ee5ff";
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI / 3 + time * (i % 2 ? -.4 : .4);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 27, Math.sin(angle) * 35);
+      ctx.lineTo(Math.cos(angle) * 48, Math.sin(angle) * 56);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#e8f8ff";
+    ctx.beginPath();
+    ctx.arc(-10, -9, 5, 0, Math.PI * 2);
+    ctx.arc(10, -9, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#79c8f2";
+    ctx.fillRect(-18, 15, 36, 8);
   }
   ctx.restore();
   ctx.shadowBlur = 0;
@@ -2474,7 +2790,9 @@ function drawHUD() {
   }
 
   const room = player.y < -900 ? "달빛 시계탑"
-    : player.y < 100 ? "빛의 수관"
+    : player.x >= 6100 && player.y < 800 ? "잿빛 제련소"
+      : player.x >= 5200 && player.y >= 800 ? "별잠 해안"
+        : player.y < 100 ? "빛의 수관"
       : player.y > 1000 ? "침수된 기록고"
         : player.y > 600 ? "가라앉은 뿌리"
       : player.x < 1500 ? "이끼 낀 회랑"
@@ -2483,10 +2801,11 @@ function drawHUD() {
             : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(225,239,250,.82)"; ctx.font = "bold 16px Georgia, serif"; ctx.fillText(room, W / 2, 32);
   const explored = save.echoes.length + save.shopItems.length
-    + save.areaBosses.length + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
+    + save.areaBosses.length + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0)
+    + (save.bellBossDefeated ? 1 : 0) + (save.forgeHeart ? 1 : 0);
   ctx.font = "13px system-ui";
   ctx.fillStyle = "rgba(177,200,219,.72)";
-  ctx.fillText(`세계 탐색도 ${Math.round(explored / 11 * 100)}%`, W / 2, 51);
+  ctx.fillText(`세계 탐색도 ${Math.min(100, Math.round(explored / 15 * 100))}%`, W / 2, 51);
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(5,9,18,.7)";
@@ -2513,7 +2832,10 @@ function drawHUD() {
       ? "#c58dea"
       : activeBoss.kind === "moon"
         ? "#e6c75f"
-        : "#70d5cd";
+        : activeBoss.kind === "forge"
+          ? "#ef7045"
+          : activeBoss.kind === "coast"
+            ? "#82d9ff" : "#70d5cd";
     ctx.fillRect(x, y, bw * activeBoss.hp / activeBoss.maxHp, 7);
     ctx.fillStyle = "#d9d4ea"; ctx.font = "bold 14px system-ui";
     ctx.fillText(activeBoss === boss ? "심연의 종지기"
@@ -2531,7 +2853,9 @@ function drawHUD() {
 
 function drawScreenAtmosphere() {
   const clocktower = player.y < -900;
-  const archive = player.y > 1000;
+  const forge = player.x >= 6100 && player.y < 800;
+  const coast = player.x >= 5200 && player.y >= 800;
+  const archive = player.y > 1000 && player.x < 5200;
   ctx.save();
   for (let i = 0; i < 34; i++) {
     const seed = i * 73.17;
@@ -2541,6 +2865,18 @@ function drawScreenAtmosphere() {
       ctx.globalAlpha = .18 + (i % 3) * .08;
       ctx.fillStyle = i % 3 ? "#f1d471" : "#a99be2";
       ctx.fillRect(Math.round(x), Math.round(y), i % 5 === 0 ? 5 : 3, i % 5 === 0 ? 5 : 3);
+    } else if (forge) {
+      const x = (seed * 5.7 + time * (18 + i % 5)) % W;
+      const y = H - ((seed * 2.6 + time * (35 + i % 7)) % H);
+      ctx.globalAlpha = .16 + (i % 4) * .05;
+      ctx.fillStyle = i % 3 ? "#ff7044" : "#ffd17a";
+      ctx.fillRect(Math.round(x), Math.round(y), 3 + i % 3, 3 + i % 3);
+    } else if (coast) {
+      const x = (seed * 6.1 - camera.x * .025) % W;
+      const y = 40 + (seed * 2.1 + Math.sin(time * .7 + i) * 22) % (H - 80);
+      ctx.globalAlpha = .13 + (i % 5) * .04;
+      ctx.fillStyle = i % 4 ? "#85ccf5" : "#edfaff";
+      ctx.fillRect(Math.round(x), Math.round(y), i % 4 ? 3 : 6, i % 4 ? 3 : 6);
     } else if (archive) {
       const x = (seed * 5.3 + Math.sin(time * .8 + i) * 30) % W;
       const y = H - ((seed * 2.4 + time * (22 + i % 6)) % (H + 20));
@@ -2572,7 +2908,10 @@ function drawPixelFinish() {
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, W, H);
   ctx.globalAlpha = .18;
-  ctx.strokeStyle = player.y < -900 ? "#dbc76c" : player.y > 1000 ? "#54c9bd" : "#709bc7";
+  ctx.strokeStyle = player.y < -900 ? "#dbc76c"
+    : player.x >= 6100 && player.y < 800 ? "#e26d42"
+      : player.x >= 5200 && player.y >= 800 ? "#70bce5"
+        : player.y > 1000 ? "#54c9bd" : "#709bc7";
   ctx.lineWidth = 2;
   ctx.strokeRect(7, 7, W - 14, H - 14);
   [[10, 10], [W - 18, 10], [10, H - 18], [W - 18, H - 18]].forEach(([x, y]) => ctx.fillRect(x, y, 8, 8));
@@ -2592,20 +2931,25 @@ function render() {
 
 function win() {
   running = false;
+  save.endingSeen = true;
+  storeSave();
   const completeGarden = save.echoes.length === echoes.length
     && save.shopItems.length === 4
     && save.midBossDefeated
     && save.areaBosses.length === areaBosses.length;
-  const endingTitle = completeGarden ? "정원이 온전히 깨어났습니다" : "정원이 깨어났습니다";
+  const endingTitle = completeGarden ? "모든 세계가 하나로 이어졌습니다" : "별잠 해안이 깨어났습니다";
   const endingText = completeGarden
-    ? "되찾은 메아리가 정원 전체에 번져<br>잊힌 종이 완전한 음색으로 울립니다."
-    : "당신이 모은 작은 소리들이<br>오래된 종을 다시 울렸습니다.";
+    ? "정원과 시계탑, 기록고, 제련소와 해안이<br>하나의 거대한 순환로로 다시 숨을 쉽니다."
+    : "정원 밖의 바닷길이 열렸습니다.<br>아직 만나지 못한 수호자와 지름길이 남아 있습니다.";
   const overlay = document.createElement("div");
   overlay.className = "overlay";
-  overlay.innerHTML = `<div class="title-mark">✦</div><p class="kicker">${completeGarden ? "탐색도 100% · 완전한 결말" : "메아리는 사라지지 않습니다"}</p><h2>${endingTitle}</h2><p>${endingText}</p><button type="button">처음부터 다시 걷기</button>`;
+  overlay.innerHTML = `<div class="title-mark">✦</div><p class="kicker">${completeGarden ? "탐색도 100% · 순환의 결말" : "새로운 길은 닫히지 않습니다"}</p><h2>${endingTitle}</h2><p>${endingText}</p><button type="button">계속 탐험하기</button>`;
   document.querySelector(".frame").append(overlay);
   overlay.querySelector("button").addEventListener("click", () => {
-    localStorage.removeItem("forgottenGarden"); location.reload();
+    overlay.remove();
+    running = true;
+    last = performance.now();
+    startGameLoop();
   });
   beep(920, 1.2, "sine", .07);
 }
