@@ -1,0 +1,167 @@
+:root {
+  color-scheme: dark;
+  --ink: #eef5ff;
+  --muted: #8d9ab8;
+  --line: rgba(175, 207, 255, .18);
+  --glow: #91dfff;
+  --violet: #9e8cff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 50% -10%, #28365c 0, transparent 38rem),
+    linear-gradient(#0b1020, #060810 70%);
+  font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  opacity: .14;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+}
+
+button { font: inherit; }
+
+.game-shell {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 24px clamp(12px, 3vw, 32px) 32px;
+}
+
+header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+h1, h2, p { margin: 0; }
+h1 { font-family: Georgia, "Noto Serif KR", serif; font-size: clamp(24px, 4vw, 38px); letter-spacing: -.04em; }
+.eyebrow, .kicker { color: var(--glow); font-size: 11px; letter-spacing: .22em; font-weight: 700; }
+
+header button, .overlay button {
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(148, 199, 255, .08);
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+header button:hover, .overlay button:hover { background: rgba(148, 199, 255, .18); border-color: rgba(145, 223, 255, .5); }
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(187, 215, 255, .22);
+  border-radius: 18px;
+  background: #080b14;
+  box-shadow: 0 24px 80px #000a, inset 0 0 80px #050710;
+}
+
+canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 15px;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(circle, rgba(20, 30, 55, .7), rgba(3, 5, 12, .96));
+  backdrop-filter: blur(5px);
+  transition: opacity .35s;
+}
+
+.overlay.hidden { opacity: 0; pointer-events: none; }
+.overlay h2 { font-family: Georgia, "Noto Serif KR", serif; font-size: clamp(32px, 7vw, 64px); letter-spacing: -.06em; text-shadow: 0 0 30px #93dcff77; }
+.overlay > p:not(.kicker) { color: #b9c4d9; line-height: 1.8; }
+.overlay button { margin-top: 8px; padding: 13px 24px; background: linear-gradient(135deg, #324264, #26304b); box-shadow: 0 0 25px #7edaff33; }
+.overlay small { color: #71809d; }
+.title-mark { color: #d8f6ff; font-size: 48px; text-shadow: 0 0 26px #8fe6ff; }
+
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  translate: -50% 12px;
+  width: max-content;
+  max-width: 80%;
+  opacity: 0;
+  padding: 10px 17px;
+  color: #dcecff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(5, 9, 20, .82);
+  text-align: center;
+  font-size: 13px;
+  transition: .25s;
+  pointer-events: none;
+}
+
+#toast.show { opacity: 1; translate: -50% 0; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 18px;
+  margin-top: 17px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.controls div { display: flex; align-items: center; gap: 5px; }
+kbd {
+  min-width: 26px;
+  padding: 4px 7px;
+  color: #dceaff;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: #11182a;
+  text-align: center;
+}
+
+.touch-controls { display: none; justify-content: space-between; margin-top: 15px; }
+.touch-group { display: flex; gap: 8px; align-items: end; }
+.touch-controls button {
+  width: 54px;
+  height: 54px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #121a2c;
+  touch-action: none;
+  user-select: none;
+}
+.touch-controls button:active, .touch-controls button.active { background: #31405d; transform: scale(.95); }
+.touch-controls small { display: block; color: var(--muted); font-size: 8px; }
+
+footer { margin-top: 15px; color: #56627b; text-align: center; font-size: 11px; }
+
+@media (pointer: coarse), (max-width: 760px) {
+  .game-shell { padding-inline: 8px; }
+  header { padding-inline: 5px; }
+  header .eyebrow { display: none; }
+  header button { font-size: 11px; padding: 7px 11px; }
+  .controls { display: none; }
+  .touch-controls { display: flex; }
+  footer { margin-top: 10px; }
+}
+
+@media (max-width: 430px) {
+  .touch-controls button { width: 48px; height: 48px; }
+  .touch-group { gap: 5px; }
+}
