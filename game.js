@@ -934,9 +934,31 @@ function updateCoins(dt) {
     const dx = player.x + player.w / 2 - coin.x;
     const dy = player.y + player.h / 2 - coin.y;
     const distance = Math.hypot(dx, dy);
+    const coinSurfaces = [
+      ...platforms,
+      ...movingPlatforms,
+      ...crumblePlatforms.filter(platform => platform.gone <= 0)
+    ];
     const magnetRange = save.relics.includes("tideSigil") ? 260 : 155;
-    if (distance < magnetRange) {
-      const pull = (1 - distance / magnetRange) * 850;
+    const platformRecoveryRange = save.relics.includes("tideSigil") ? 500 : 380;
+    const trappedBelowPlatform = dy < 0
+      && Math.abs(dx) < 135
+      && distance < platformRecoveryRange
+      && coinSurfaces.some(platform => {
+        const playerOverPlatform = player.x + player.w / 2 >= platform.x
+          && player.x + player.w / 2 <= platform.x + platform.w;
+        const coinUnderPlatform = coin.x >= platform.x - 7
+          && coin.x <= platform.x + platform.w + 7
+          && player.y + player.h / 2 < platform.y
+          && coin.y > platform.y + platform.h;
+        return playerOverPlatform && coinUnderPlatform;
+      });
+    coin.recovering = trappedBelowPlatform;
+    if (distance < magnetRange || trappedBelowPlatform) {
+      const activeRange = trappedBelowPlatform ? platformRecoveryRange : magnetRange;
+      const pull = trappedBelowPlatform
+        ? 1500 + (1 - distance / activeRange) * 500
+        : (1 - distance / activeRange) * 850;
       coin.vx += dx / Math.max(distance, 1) * pull * dt;
       coin.vy += dy / Math.max(distance, 1) * pull * dt;
     }
@@ -946,11 +968,6 @@ function updateCoins(dt) {
 
     if (coin.vy > 0) {
       const coinRadius = 7;
-      const coinSurfaces = [
-        ...platforms,
-        ...movingPlatforms,
-        ...crumblePlatforms.filter(platform => platform.gone <= 0)
-      ];
       let landingY = Infinity;
 
       coinSurfaces.forEach(platform => {
@@ -1758,6 +1775,12 @@ function drawWorld() {
     ctx.strokeStyle = "#fff0ad";
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    if (coin.recovering) {
+      ctx.globalAlpha = .55;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12 + Math.sin(time * 12) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   });
   bossProjectiles.forEach(projectile => {
