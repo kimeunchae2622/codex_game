@@ -2,11 +2,22 @@
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
 const startScreen = document.querySelector("#startScreen");
 const pauseScreen = document.querySelector("#pauseScreen");
 const shopScreen = document.querySelector("#shopScreen");
 const shopCoinsEl = document.querySelector("#shopCoins");
 const shopMessageEl = document.querySelector("#shopMessage");
+const shopGridEl = document.querySelector("#shopGrid");
+const shopKickerEl = document.querySelector("#shopKicker");
+const shopTitleEl = document.querySelector("#shopTitle");
+const inventoryScreen = document.querySelector("#inventoryScreen");
+const equipmentListEl = document.querySelector("#equipmentList");
+const sigilGridEl = document.querySelector("#sigilGrid");
+const sigilSlotCountEl = document.querySelector("#sigilSlotCount");
+const sigilSlotPipsEl = document.querySelector("#sigilSlotPips");
+const sigilOwnedCountEl = document.querySelector("#sigilOwnedCount");
+const inventoryMessageEl = document.querySelector("#inventoryMessage");
 const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
@@ -20,7 +31,12 @@ const taps = new Set();
 let running = false;
 let paused = false;
 let shopOpen = false;
+let inventoryOpen = false;
 let shopSelection = 0;
+let inventorySelection = 0;
+let activeVendor = null;
+let shopButtons = [];
+let inventoryButtons = [];
 let last = 0;
 let time = 0;
 let shake = 0;
@@ -40,7 +56,9 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const saveDefault = {
   checkpoint: 90, dash: false, echoes: [], defeated: [],
   checkpointY: 380, coins: 0, lostCoins: null, shopItems: [], opened: false,
-  midBossDefeated: false, areaBosses: [], relics: []
+  midBossDefeated: false, areaBosses: [], relics: [],
+  ownedSigils: [], equippedSigils: [], sigilSlots: 3,
+  slotUpgrades: [], slotRewards: []
 };
 let save = loadSave();
 
@@ -54,11 +72,118 @@ function loadSave() {
 }
 function storeSave() { localStorage.setItem("forgottenGarden", JSON.stringify(save)); }
 
+const sigilCatalog = {
+  tideSigil: { name: "회수의 인장", slots: 1, color: "#65e5d2", glyph: "◉", description: "떨어진 모든 코인이 즉시 주인을 찾아옵니다.", effects: { globalMagnet: 1 } },
+  thornMark: { name: "가시꽃 인장", slots: 1, color: "#ef7f9b", glyph: "✣", description: "공격력이 1 증가합니다.", effects: { attack: 1 } },
+  mossHeart: { name: "이끼심장", slots: 2, color: "#79cf8d", glyph: "♥", description: "최대 체력이 1 증가합니다.", effects: { maxHp: 1 } },
+  swiftRoot: { name: "빠른뿌리", slots: 1, color: "#9bd88a", glyph: "⌁", description: "이동 속도가 12% 증가합니다.", effects: { move: .12 } },
+  sharpPetal: { name: "날선 꽃잎", slots: 2, color: "#ff9eab", glyph: "◆", description: "공격력이 1, 공격 범위가 증가합니다.", effects: { attack: 1, reach: 8 } },
+  coinBloom: { name: "금빛꽃", slots: 1, color: "#ffd36d", glyph: "✤", description: "적이 코인을 1개 더 떨어뜨립니다.", effects: { coinBonus: 1 } },
+  quietStep: { name: "고요한 걸음", slots: 1, color: "#a9c7da", glyph: "⋰", description: "피격 후 무적 시간이 길어집니다.", effects: { invulnerability: .2 } },
+  longNeedle: { name: "긴 바늘", slots: 2, color: "#d8e9ef", glyph: "†", description: "모든 방향의 공격 범위가 크게 늘어납니다.", effects: { reach: 16 } },
+  secondWind: { name: "되살이숨", slots: 3, color: "#b8f5c8", glyph: "♧", description: "최대 체력 1, 점프력이 8% 증가합니다.", effects: { maxHp: 1, jump: .08 } },
+
+  brassWing: { name: "황동 날개", slots: 2, color: "#e4bd67", glyph: "⌁", description: "점프력이 14% 증가합니다.", effects: { jump: .14 } },
+  cometDash: { name: "혜성 돌진", slots: 2, color: "#f6dd8b", glyph: "➤", description: "대시 속도와 거리가 증가합니다.", effects: { dashSpeed: .16, dashDuration: .12 } },
+  hourglass: { name: "모래시계", slots: 1, color: "#d4bb80", glyph: "⌛", description: "대시 재사용 시간이 16% 감소합니다.", effects: { dashCooldown: .16 } },
+  orbitBlade: { name: "궤도 칼날", slots: 3, color: "#ffe69d", glyph: "◌", description: "공격력 2, 공격 범위가 증가합니다.", effects: { attack: 2, reach: 6 } },
+  starNeedle: { name: "별바늘", slots: 2, color: "#fff0a8", glyph: "✦", description: "공격력 1, 공격 범위가 증가합니다.", effects: { attack: 1, reach: 10 } },
+  clockShield: { name: "시계 방패", slots: 2, color: "#aab5d8", glyph: "⬡", description: "최대 체력과 무적 시간이 증가합니다.", effects: { maxHp: 1, invulnerability: .12 } },
+  lunarStep: { name: "달그림자", slots: 1, color: "#bdaeff", glyph: "☾", description: "이동 속도가 10% 증가합니다.", effects: { move: .1 } },
+  echoDash: { name: "잔향 돌진", slots: 2, color: "#b69cff", glyph: "»", description: "대시 거리와 재사용 속도가 좋아집니다.", effects: { dashDuration: .18, dashCooldown: .1 } },
+  gearHeart: { name: "태엽심장", slots: 3, color: "#dd9f5f", glyph: "⚙", description: "최대 체력이 2 증가합니다.", effects: { maxHp: 2 } },
+
+  archiveEye: { name: "기록자의 눈", slots: 1, color: "#72dfd1", glyph: "◈", description: "주변 코인 흡수 범위가 늘어납니다.", effects: { magnet: 190 } },
+  inkHeart: { name: "먹빛심장", slots: 2, color: "#4ba8b4", glyph: "♥", description: "최대 체력이 1 증가합니다.", effects: { maxHp: 1 } },
+  deepCurrent: { name: "깊은 물결", slots: 1, color: "#65c9d9", glyph: "≈", description: "이동과 점프가 조금 빨라집니다.", effects: { move: .07, jump: .06 } },
+  collector: { name: "수집가", slots: 2, color: "#efc45e", glyph: "◇", description: "적이 코인을 2개 더 떨어뜨립니다.", effects: { coinBonus: 2 } },
+  floodedWing: { name: "잠긴 날개", slots: 2, color: "#77d6c9", glyph: "ϟ", description: "공중 점프를 1회 추가합니다.", effects: { airJumps: 1 } },
+  memoryEdge: { name: "기억의 날", slots: 3, color: "#9ee9df", glyph: "⋈", description: "공격력 2, 공격 범위가 증가합니다.", effects: { attack: 2, reach: 10 } },
+  bubbleGuard: { name: "거품 방패", slots: 2, color: "#87dff4", glyph: "○", description: "최대 체력 1, 무적 시간이 증가합니다.", effects: { maxHp: 1, invulnerability: .16 } },
+  drownedLuck: { name: "침수된 행운", slots: 1, color: "#e0bf63", glyph: "✧", description: "코인 추가 획득 확률이 높아집니다.", effects: { coinBonus: 1 } },
+  abyssStep: { name: "심연 걸음", slots: 2, color: "#7699d8", glyph: "≋", description: "이동과 대시 속도가 증가합니다.", effects: { move: .1, dashSpeed: .1 } },
+
+  moonGear: { name: "월륜 톱니", slots: 2, color: "#f4d567", glyph: "☼", description: "대시 재사용 시간이 28% 감소합니다.", effects: { dashCooldown: .28 }, boss: true },
+  archiveCrown: { name: "기록고의 왕관", slots: 2, color: "#62e3d2", glyph: "♛", description: "코인 흡수 범위와 최대 체력이 증가합니다.", effects: { magnet: 260, maxHp: 1 }, boss: true },
+  wardenPulse: { name: "수문장의 맥동", slots: 3, color: "#86eadc", glyph: "✺", description: "공격력과 최대 체력이 1 증가합니다.", effects: { attack: 1, maxHp: 1 }, boss: true }
+};
+
+const equipmentCatalog = {
+  weapon: { cost: 8, name: "새벽의 칼날", description: "기본 공격력 +1", type: "equipment" },
+  armor: { cost: 10, name: "이끼 갑옷", description: "기본 최대 체력 +1", type: "equipment" },
+  doubleJump: { cost: 12, name: "나방의 날개", description: "공중 점프 +1", type: "equipment" },
+  bellKey: { cost: 6, name: "종루의 열쇠", description: "최종 보스 관문을 여는 열쇠", type: "equipment" }
+};
+
+const gardenSigils = ["tideSigil", "thornMark", "mossHeart", "swiftRoot", "sharpPetal", "coinBloom", "quietStep", "longNeedle", "secondWind"];
+const clockSigils = ["brassWing", "cometDash", "hourglass", "orbitBlade", "starNeedle", "clockShield", "lunarStep", "echoDash", "gearHeart"];
+const archiveSigils = ["archiveEye", "inkHeart", "deepCurrent", "collector", "floodedWing", "memoryEdge", "bubbleGuard", "drownedLuck", "abyssStep"];
+const sigilCosts = {
+  tideSigil: 6, thornMark: 7, mossHeart: 9, swiftRoot: 6, sharpPetal: 11, coinBloom: 5, quietStep: 6, longNeedle: 10, secondWind: 13,
+  brassWing: 9, cometDash: 10, hourglass: 7, orbitBlade: 15, starNeedle: 11, clockShield: 12, lunarStep: 8, echoDash: 11, gearHeart: 16,
+  archiveEye: 7, inkHeart: 10, deepCurrent: 8, collector: 11, floodedWing: 12, memoryEdge: 16, bubbleGuard: 12, drownedLuck: 7, abyssStep: 11
+};
+
+function normalizeSave() {
+  ["echoes", "defeated", "shopItems", "areaBosses", "relics", "ownedSigils", "equippedSigils", "slotUpgrades", "slotRewards"]
+    .forEach(key => { if (!Array.isArray(save[key])) save[key] = []; });
+  if (!Number.isFinite(save.sigilSlots)) save.sigilSlots = 3;
+  save.relics.forEach(id => {
+    if (sigilCatalog[id] && !save.ownedSigils.includes(id)) save.ownedSigils.push(id);
+  });
+  const legacyRewards = [
+    [save.midBossDefeated, "wardenPulse", "midBoss"],
+    [save.areaBosses.includes("moonKeeper"), "moonGear", "moonKeeper"],
+    [save.areaBosses.includes("archiveKeeper"), "archiveCrown", "archiveKeeper"]
+  ];
+  legacyRewards.forEach(([earned, sigilId, rewardId]) => {
+    if (earned && !save.ownedSigils.includes(sigilId)) save.ownedSigils.push(sigilId);
+    if (earned && !save.slotRewards.includes(rewardId)) {
+      save.slotRewards.push(rewardId);
+      save.sigilSlots++;
+    }
+  });
+  save.equippedSigils = save.equippedSigils.filter(id => save.ownedSigils.includes(id) && sigilCatalog[id]);
+  let used = 0;
+  save.equippedSigils = save.equippedSigils.filter(id => {
+    used += sigilCatalog[id].slots;
+    return used <= save.sigilSlots;
+  });
+  save.relics.forEach(id => {
+    const sigil = sigilCatalog[id];
+    if (sigil && !save.equippedSigils.includes(id) && used + sigil.slots <= save.sigilSlots) {
+      save.equippedSigils.push(id);
+      used += sigil.slots;
+    }
+  });
+  storeSave();
+}
+normalizeSave();
+
+function sigilStats() {
+  const stats = {
+    attack: 0, maxHp: 0, move: 0, jump: 0, dashSpeed: 0, dashDuration: 0,
+    dashCooldown: 0, reach: 0, coinBonus: 0, magnet: 0,
+    invulnerability: 0, airJumps: 0, globalMagnet: 0
+  };
+  save.equippedSigils.forEach(id => {
+    const effects = sigilCatalog[id]?.effects || {};
+    Object.entries(effects).forEach(([key, value]) => { stats[key] += value; });
+  });
+  return stats;
+}
+
+function usedSigilSlots() {
+  return save.equippedSigils.reduce((total, id) => total + (sigilCatalog[id]?.slots || 0), 0);
+}
+
+function hasSigil(id) { return save.equippedSigils.includes(id); }
+
 const player = {
   x: save.checkpoint, y: save.checkpointY, w: 28, h: 43, vx: 0, vy: 0, dir: 1,
   grounded: false, coyote: 0, jumpBuffer: 0, airJumps: 0,
-  hp: 4 + (save.shopItems.includes("armor") ? 1 : 0),
-  maxHp: 4 + (save.shopItems.includes("armor") ? 1 : 0),
+  hp: 4 + (save.shopItems.includes("armor") ? 1 : 0) + sigilStats().maxHp,
+  maxHp: 4 + (save.shopItems.includes("armor") ? 1 : 0) + sigilStats().maxHp,
   inv: 0, attack: 0, attackId: 0, attackDir: "side", dash: 0, dashCool: 0,
   look: 0, respawning: 0
 };
@@ -67,12 +192,27 @@ const camera = { x: 0, y: 0 };
 const particles = [];
 const coinDrops = [];
 const bossProjectiles = [];
-const merchant = { x: 1810, y: FLOOR - 47, w: 34, h: 47 };
-const shopCatalog = {
-  weapon: { cost: 8, name: "새벽의 칼날" },
-  armor: { cost: 10, name: "이끼 갑옷" },
-  doubleJump: { cost: 12, name: "나방의 날개" },
-  bellKey: { cost: 6, name: "종루의 열쇠" }
+const vendors = [
+  {
+    id: "garden", x: 1810, y: FLOOR - 47, w: 34, h: 47,
+    name: "방랑자의 상점", kicker: "뿌리 상인의 작업대", color: "#ffe3a2",
+    products: ["weapon", "armor", "doubleJump", "bellKey", ...gardenSigils, "gardenSlot"]
+  },
+  {
+    id: "clock", x: 4485, y: -1107, w: 34, h: 47,
+    name: "황동 천문 상점", kicker: "달빛 시계공의 진열대", color: "#f4d477",
+    products: [...clockSigils, "clockSlot"]
+  },
+  {
+    id: "archive", x: 4190, y: 1143, w: 34, h: 47,
+    name: "잠긴 기록 상점", kicker: "침수된 서기관의 장서", color: "#6be0d2",
+    products: [...archiveSigils, "archiveSlot"]
+  }
+];
+const slotProducts = {
+  gardenSlot: { type: "slot", name: "새 인장 홈", description: "인장 슬롯 +1", cost: 12 },
+  clockSlot: { type: "slot", name: "황동 인장 홈", description: "인장 슬롯 +1", cost: 18 },
+  archiveSlot: { type: "slot", name: "기록 인장 홈", description: "인장 슬롯 +1", cost: 22 }
 };
 const motes = Array.from({ length: 90 }, (_, i) => ({
   x: (i * 137.3) % WORLD_W, y: 50 + (i * 83.1) % 390, r: rnd(.5, 2), phase: rnd(0, 6.28), depth: rnd(.15, .75)
@@ -222,7 +362,7 @@ function supportTopAt(x, preferredY = FLOOR) {
 }
 
 function getMaxHp() {
-  return 4 + (save.shopItems.includes("armor") ? 1 : 0);
+  return 4 + (save.shopItems.includes("armor") ? 1 : 0) + sigilStats().maxHp;
 }
 
 function resetEntities() {
@@ -299,24 +439,59 @@ function puff(x, y, color = "#b9eeff", count = 8, speed = 150) {
 
 function down(code) { return keys.has(code); }
 function tap(code) { return taps.has(code); }
-const shopButtons = [...document.querySelectorAll("[data-shop-item]")];
 
 function updateShopUI(message = "몬스터가 떨어뜨린 코인으로 장비를 준비하세요.") {
   shopCoinsEl.textContent = save.coins;
   shopMessageEl.textContent = message;
   shopButtons.forEach((button, index) => {
-    const id = button.dataset.shopItem;
-    const owned = save.shopItems.includes(id);
+    const id = button.dataset.productId;
+    const product = getProduct(id);
+    const owned = isProductOwned(id);
     button.disabled = owned;
     button.classList.toggle("owned", owned);
     button.classList.toggle("selected", index === shopSelection);
-    button.querySelector("b").textContent = owned ? "구매 완료" : `${shopCatalog[id].cost} ◈`;
+    button.querySelector("b").textContent = owned ? "구매 완료" : `${product.cost} ◈`;
+    if (index === shopSelection) button.scrollIntoView({ block: "nearest" });
   });
 }
 
-function openShop() {
+function getProduct(id) {
+  if (equipmentCatalog[id]) return equipmentCatalog[id];
+  if (slotProducts[id]) return slotProducts[id];
+  if (sigilCatalog[id]) return {
+    ...sigilCatalog[id], type: "sigil", cost: sigilCosts[id] ?? 0,
+    description: `${sigilCatalog[id].description} · ${sigilCatalog[id].slots}칸`
+  };
+  return null;
+}
+
+function isProductOwned(id) {
+  if (equipmentCatalog[id]) return save.shopItems.includes(id);
+  if (slotProducts[id]) return save.slotUpgrades.includes(id);
+  return save.ownedSigils.includes(id);
+}
+
+function renderShopProducts() {
+  shopGridEl.replaceChildren();
+  activeVendor.products.forEach(id => {
+    const product = getProduct(id);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.productId = id;
+    button.innerHTML = `<span>${product.name}</span><small>${product.description}</small><b>${product.cost} ◈</b>`;
+    button.addEventListener("click", () => buyShopItem(id));
+    shopGridEl.append(button);
+  });
+  shopButtons = [...shopGridEl.querySelectorAll("button")];
+}
+
+function openShop(vendor) {
+  activeVendor = vendor;
   shopOpen = true;
-  const firstAvailable = shopButtons.findIndex(button => !save.shopItems.includes(button.dataset.shopItem));
+  shopKickerEl.textContent = vendor.kicker;
+  shopTitleEl.textContent = vendor.name;
+  renderShopProducts();
+  const firstAvailable = shopButtons.findIndex(button => !isProductOwned(button.dataset.productId));
   shopSelection = firstAvailable >= 0 ? firstAvailable : 0;
   keys.clear();
   taps.clear();
@@ -326,6 +501,7 @@ function openShop() {
 
 function closeShop() {
   shopOpen = false;
+  activeVendor = null;
   shopScreen.classList.add("hidden");
   keys.delete("KeyA");
   taps.delete("KeyA");
@@ -333,8 +509,8 @@ function closeShop() {
 }
 
 function buyShopItem(id) {
-  const item = shopCatalog[id];
-  if (!item || save.shopItems.includes(id)) return;
+  const item = getProduct(id);
+  if (!item || isProductOwned(id)) return;
   if (id === "bellKey") {
     const gearReady = ["weapon", "armor", "doubleJump"].every(itemId => save.shopItems.includes(itemId));
     if (!gearReady || save.echoes.length < 3 || !save.midBossDefeated) {
@@ -347,12 +523,21 @@ function buyShopItem(id) {
     return;
   }
   save.coins -= item.cost;
-  save.shopItems.push(id);
+  if (item.type === "equipment") {
+    save.shopItems.push(id);
+  } else if (item.type === "slot") {
+    save.slotUpgrades.push(id);
+    save.sigilSlots++;
+  } else {
+    save.ownedSigils.push(id);
+    if (usedSigilSlots() + item.slots <= save.sigilSlots) save.equippedSigils.push(id);
+  }
   player.maxHp = getMaxHp();
   player.hp = player.maxHp;
   storeSave();
-  updateShopUI(`${item.name}을(를) 구매했습니다.`);
-  puff(merchant.x, merchant.y, id === "bellKey" ? "#ffe19a" : "#a8f0dd", 20, 150);
+  const equipNote = item.type === "sigil" && hasSigil(id) ? " · 빈 슬롯에 자동 장착" : "";
+  updateShopUI(`${item.name}을(를) 구매했습니다${equipNote}.`);
+  puff(activeVendor.x, activeVendor.y, id === "bellKey" ? "#ffe19a" : activeVendor.color, 20, 150);
   beep(id === "bellKey" ? 880 : 650, .45, "sine", .055);
 }
 
@@ -370,17 +555,131 @@ function moveShopSelection(code) {
   beep(420 + shopSelection * 35, .04, "sine", .018);
 }
 
+function equipmentRows() {
+  return [
+    ["weapon", "새벽의 칼날", "공격력 +1"],
+    ["armor", "이끼 갑옷", "최대 체력 +1"],
+    ["doubleJump", "나방의 날개", "공중 점프 +1"],
+    ["bellKey", "종루의 열쇠", "최종 관문 개방"],
+    ["dash", "그림자 대시", "C로 빠르게 돌진"]
+  ];
+}
+
+function renderInventory(message = "방향키로 선택 · Z 장착/해제 · I 또는 A 닫기") {
+  const used = usedSigilSlots();
+  sigilSlotCountEl.textContent = `${used} / ${save.sigilSlots}`;
+  sigilOwnedCountEl.textContent = `${save.ownedSigils.length} / ${Object.keys(sigilCatalog).length}`;
+  sigilSlotPipsEl.innerHTML = Array.from({ length: save.sigilSlots }, (_, i) =>
+    `<i class="${i < used ? "used" : ""}"></i>`).join("");
+  equipmentListEl.innerHTML = equipmentRows().map(([id, name, description]) => {
+    const owned = id === "dash" ? save.dash : save.shopItems.includes(id);
+    return `<div class="${owned ? "owned" : ""}"><b>${owned ? "◆" : "◇"} ${name}</b><br><small>${owned ? description : "아직 발견하지 못함"}</small></div>`;
+  }).join("");
+
+  sigilGridEl.replaceChildren();
+  save.ownedSigils.forEach(id => {
+    const sigil = sigilCatalog[id];
+    if (!sigil) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sigil-card";
+    button.style.setProperty("--sigil-color", sigil.color);
+    button.dataset.sigilId = id;
+    button.innerHTML = `<i class="sigil-glyph">${sigil.glyph}</i><span>${sigil.name}</span><b>${sigil.slots}칸</b><small>${sigil.description}</small>`;
+    button.addEventListener("click", () => toggleSigil(id));
+    sigilGridEl.append(button);
+  });
+  if (!save.ownedSigils.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-sigils";
+    empty.textContent = "아직 가진 인장이 없습니다. 지역 상인과 수호자를 찾아보세요.";
+    sigilGridEl.append(empty);
+  }
+  inventoryButtons = [...sigilGridEl.querySelectorAll(".sigil-card")];
+  inventorySelection = clamp(inventorySelection, 0, Math.max(0, inventoryButtons.length - 1));
+  inventoryButtons.forEach((button, index) => {
+    button.classList.toggle("equipped", hasSigil(button.dataset.sigilId));
+    button.classList.toggle("selected", index === inventorySelection);
+    if (index === inventorySelection) button.scrollIntoView({ block: "nearest" });
+  });
+  inventoryMessageEl.textContent = message;
+}
+
+function openInventory() {
+  inventoryOpen = true;
+  inventorySelection = 0;
+  keys.clear();
+  taps.clear();
+  renderInventory();
+  inventoryScreen.classList.remove("hidden");
+}
+
+function closeInventory() {
+  inventoryOpen = false;
+  inventoryScreen.classList.add("hidden");
+  keys.delete("KeyI");
+  keys.delete("KeyA");
+  last = performance.now();
+}
+
+function toggleSigil(id) {
+  const sigil = sigilCatalog[id];
+  if (!sigil) return;
+  const oldMax = player.maxHp;
+  if (hasSigil(id)) {
+    save.equippedSigils = save.equippedSigils.filter(equippedId => equippedId !== id);
+    renderInventory(`${sigil.name}을(를) 해제했습니다.`);
+  } else if (usedSigilSlots() + sigil.slots > save.sigilSlots) {
+    renderInventory(`빈 슬롯이 ${usedSigilSlots() + sigil.slots - save.sigilSlots}칸 부족합니다.`);
+    beep(120, .12, "square", .03);
+    return;
+  } else {
+    save.equippedSigils.push(id);
+    renderInventory(`${sigil.name}을(를) 장착했습니다.`);
+  }
+  player.maxHp = getMaxHp();
+  player.hp = clamp(player.hp + Math.max(0, player.maxHp - oldMax), 1, player.maxHp);
+  storeSave();
+  puff(player.x + player.w / 2, player.y + player.h / 2, sigil.color, 16, 125);
+  beep(hasSigil(id) ? 680 : 340, .12, "sine", .035);
+}
+
+function moveInventorySelection(code) {
+  if (!inventoryButtons.length) return;
+  const columns = innerWidth <= 700 ? 1 : 2;
+  const rows = Math.ceil(inventoryButtons.length / columns);
+  const row = Math.floor(inventorySelection / columns);
+  const column = inventorySelection % columns;
+  if (code === "ArrowLeft") inventorySelection = row * columns + (column + columns - 1) % columns;
+  if (code === "ArrowRight") inventorySelection = row * columns + (column + 1) % columns;
+  if (code === "ArrowUp") inventorySelection = ((row + rows - 1) % rows) * columns + column;
+  if (code === "ArrowDown") inventorySelection = ((row + 1) % rows) * columns + column;
+  inventorySelection = clamp(inventorySelection, 0, inventoryButtons.length - 1);
+  renderInventory();
+  beep(380 + inventorySelection * 12, .035, "sine", .015);
+}
+
 addEventListener("keydown", e => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "Escape"].includes(e.code)) e.preventDefault();
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "KeyI", "Escape"].includes(e.code)) e.preventDefault();
   if (shopOpen) {
     if (e.code === "KeyA") closeShop();
     else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) moveShopSelection(e.code);
-    else if (e.code === "KeyZ") buyShopItem(shopButtons[shopSelection].dataset.shopItem);
+    else if (e.code === "KeyZ") buyShopItem(shopButtons[shopSelection].dataset.productId);
+    return;
+  }
+  if (inventoryOpen) {
+    if (e.code === "KeyI" || e.code === "KeyA" || e.code === "Escape") closeInventory();
+    else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) moveInventorySelection(e.code);
+    else if (e.code === "KeyZ" && inventoryButtons.length) toggleSigil(inventoryButtons[inventorySelection].dataset.sigilId);
     return;
   }
   const firstPress = !keys.has(e.code);
   if (firstPress) taps.add(e.code);
   keys.add(e.code);
+  if (e.code === "KeyI" && running && !paused && firstPress && !e.repeat) {
+    openInventory();
+    return;
+  }
   if (e.code === "Escape" && running && firstPress && !e.repeat) togglePause();
 });
 addEventListener("keyup", e => keys.delete(e.code));
@@ -412,12 +711,6 @@ document.querySelectorAll("[data-reset-game]").forEach(button => {
     if (!confirmed) return;
     localStorage.removeItem("forgottenGarden");
     location.reload();
-  });
-});
-shopButtons.forEach((button, index) => {
-  button.addEventListener("click", () => {
-    shopSelection = index;
-    updateShopUI("선택한 품목은 키보드 Z로 구매하세요.");
   });
 });
 document.querySelector("#soundButton").addEventListener("click", e => {
@@ -483,12 +776,13 @@ function togglePause() {
 }
 
 function moveAndCollide(dt) {
+  const stats = sigilStats();
   if (player.dash > 0) {
-    player.vx = player.dir * 760;
+    player.vx = player.dir * 760 * (1 + stats.dashSpeed);
     player.vy = 0;
   } else {
     const move = (down("ArrowRight") ? 1 : 0) - (down("ArrowLeft") ? 1 : 0);
-    const target = move * 235;
+    const target = move * 235 * (1 + stats.move);
     player.vx = lerp(player.vx, target, 1 - Math.pow(.0004, dt));
     if (!move) player.vx *= Math.pow(.002, dt);
     if (move) player.dir = move;
@@ -534,7 +828,7 @@ function moveAndCollide(dt) {
       player.vy = 0;
       player.grounded = true;
       player.coyote = .1;
-      player.airJumps = save.shopItems.includes("doubleJump") ? 1 : 0;
+      player.airJumps = (save.shopItems.includes("doubleJump") ? 1 : 0) + stats.airJumps;
       if (p.moving) player.x += p.dx;
       if (p.crumble && p.timer === 0) p.timer = .001;
     } else if (player.vy < 0 && (crossedBottom || overlap(player, p))) {
@@ -548,7 +842,7 @@ function moveAndCollide(dt) {
 function hurt(amount, sourceX) {
   if (player.inv > 0 || player.respawning > 0 || boss?.dead) return;
   player.hp -= amount;
-  player.inv = 1.15;
+  player.inv = 1.15 + sigilStats().invulnerability;
   player.vx = player.x < sourceX ? -310 : 310;
   player.vy = -330;
   shake = 12;
@@ -608,24 +902,29 @@ function respawn() {
 
 function attackRect() {
   const improved = save.shopItems.includes("weapon");
-  const reach = improved ? 66 : 56;
+  const sigilReach = sigilStats().reach;
+  const reach = (improved ? 66 : 56) + sigilReach;
   if (player.attackDir === "up") {
-    return { x: player.x - 14, y: player.y - (improved ? 58 : 50), w: 56, h: improved ? 66 : 58 };
+    return { x: player.x - 14 - sigilReach / 4, y: player.y - (improved ? 58 : 50) - sigilReach, w: 56 + sigilReach / 2, h: (improved ? 66 : 58) + sigilReach };
   }
   if (player.attackDir === "down") {
-    return { x: player.x - 14, y: player.y + player.h - 8, w: 56, h: improved ? 66 : 58 };
+    return { x: player.x - 14 - sigilReach / 4, y: player.y + player.h - 8, w: 56 + sigilReach / 2, h: (improved ? 66 : 58) + sigilReach };
   }
-  return { x: player.dir > 0 ? player.x + 20 : player.x - (improved ? 58 : 48), y: player.y + 5, w: reach, h: 36 };
+  return { x: player.dir > 0 ? player.x + 20 : player.x - reach + 8, y: player.y + 5, w: reach, h: 36 };
 }
 
 function bounceFromDownwardHit(target) {
   const playerFeet = player.y + player.h;
   const struckFromAbove = playerFeet <= target.y + target.h * .7;
   if (player.attackDir !== "down" || !struckFromAbove) return;
-  player.vy = -335;
+  player.vy = -335 * (1 + sigilStats().jump * .35);
   player.grounded = false;
   player.coyote = 0;
   puff(player.x + player.w / 2, player.y + player.h, "#c9f4ff", 9, 115);
+}
+
+function getAttackPower() {
+  return 1 + (save.shopItems.includes("weapon") ? 1 : 0) + sigilStats().attack;
 }
 
 function updatePlatforms(dt) {
@@ -674,6 +973,7 @@ function updatePlatforms(dt) {
 }
 
 function updatePlayer(dt) {
+  const stats = sigilStats();
   player.inv -= dt; player.attack -= dt; player.dash -= dt; player.dashCool -= dt;
   player.coyote -= dt; player.jumpBuffer -= dt;
 
@@ -681,7 +981,7 @@ function updatePlayer(dt) {
   if (player.jumpBuffer > 0 && player.dash <= 0 && (player.coyote > 0 || player.airJumps > 0)) {
     const airJump = player.coyote <= 0;
     if (airJump) player.airJumps--;
-    player.vy = airJump ? -485 : -520;
+    player.vy = (airJump ? -485 : -520) * (1 + stats.jump);
     player.grounded = false; player.coyote = 0; player.jumpBuffer = 0;
     puff(player.x + 14, player.y + player.h, airJump ? "#d8c8ff" : "#9fb8ce", airJump ? 13 : 7, airJump ? 140 : 90);
     beep(airJump ? 440 : 280, .08, "triangle", .04);
@@ -696,8 +996,8 @@ function updatePlayer(dt) {
   if (tap("KeyC") && player.dashCool <= 0) {
     if (!save.dash) toast("대시의 기억이 아직 잠들어 있습니다");
     else {
-      player.dash = .16;
-      player.dashCool = save.relics.includes("moonGear") ? .36 : .55;
+      player.dash = .16 * (1 + stats.dashDuration);
+      player.dashCool = .55 * (1 - clamp(stats.dashCooldown, 0, .65));
       player.inv = Math.max(player.inv, .18);
       puff(player.x + 14, player.y + 22, "#a59bff", 12, 180);
       beep(170, .13, "square", .04);
@@ -712,7 +1012,7 @@ function updatePlayer(dt) {
       player.x + player.w / 2 - save.lostCoins.x,
       player.y + player.h / 2 - save.lostCoins.y
     );
-    if (distance < 36) {
+    if (distance < 36 || hasSigil("tideSigil")) {
       const recovered = save.lostCoins.amount;
       save.coins += recovered;
       save.lostCoins = null;
@@ -723,8 +1023,12 @@ function updatePlayer(dt) {
     }
   }
 
-  if (Math.abs(player.x + player.w / 2 - (merchant.x + merchant.w / 2)) < 58 && player.y > 385 && tap("ArrowDown")) {
-    openShop();
+  const nearbyVendor = vendors.find(vendor =>
+    Math.abs(player.x + player.w / 2 - (vendor.x + vendor.w / 2)) < 60
+    && Math.abs(player.y + player.h / 2 - (vendor.y + vendor.h / 2)) < 72
+  );
+  if (nearbyVendor && tap("ArrowDown")) {
+    openShop(nearbyVendor);
     return;
   }
 
@@ -890,7 +1194,7 @@ function updateEnemies(dt) {
       e.y = clamp(e.y, 1020, 1145);
     }
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
-      const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+      const attackPower = getAttackPower();
       const knockDirection = Math.sign(
         e.x + e.w / 2 - (player.x + player.w / 2)
       ) || player.dir;
@@ -916,7 +1220,8 @@ function updateEnemies(dt) {
 }
 
 function spawnCoins(x, y, count) {
-  for (let i = 0; i < count; i++) {
+  const total = count + sigilStats().coinBonus;
+  for (let i = 0; i < total; i++) {
     coinDrops.push({
       x, y, vx: rnd(-115, 115), vy: rnd(-320, -190),
       value: 1, life: 18, phase: rnd(0, Math.PI * 2)
@@ -926,6 +1231,7 @@ function spawnCoins(x, y, count) {
 }
 
 function updateCoins(dt) {
+  const stats = sigilStats();
   for (let i = coinDrops.length - 1; i >= 0; i--) {
     const coin = coinDrops[i];
     const previousY = coin.y;
@@ -939,8 +1245,9 @@ function updateCoins(dt) {
       ...movingPlatforms,
       ...crumblePlatforms.filter(platform => platform.gone <= 0)
     ];
-    const magnetRange = save.relics.includes("tideSigil") ? 260 : 155;
-    const platformRecoveryRange = save.relics.includes("tideSigil") ? 500 : 380;
+    const globalRecovery = stats.globalMagnet > 0;
+    const magnetRange = 155 + stats.magnet;
+    const platformRecoveryRange = 380 + stats.magnet;
     const trappedBelowPlatform = dy < 0
       && Math.abs(dx) < 135
       && distance < platformRecoveryRange
@@ -953,10 +1260,12 @@ function updateCoins(dt) {
           && coin.y > platform.y + platform.h;
         return playerOverPlatform && coinUnderPlatform;
       });
-    coin.recovering = trappedBelowPlatform;
-    if (distance < magnetRange || trappedBelowPlatform) {
-      const activeRange = trappedBelowPlatform ? platformRecoveryRange : magnetRange;
-      const pull = trappedBelowPlatform
+    coin.recovering = trappedBelowPlatform || globalRecovery;
+    if (globalRecovery || distance < magnetRange || trappedBelowPlatform) {
+      const activeRange = globalRecovery ? Math.max(WORLD_W, WORLD_BOTTOM - WORLD_TOP) : trappedBelowPlatform ? platformRecoveryRange : magnetRange;
+      const pull = globalRecovery
+        ? 2250
+        : trappedBelowPlatform
         ? 1500 + (1 - distance / activeRange) * 500
         : (1 - distance / activeRange) * 850;
       coin.vx += dx / Math.max(distance, 1) * pull * dt;
@@ -1105,7 +1414,7 @@ function updateMidBoss(dt) {
 
   const hitbox = player.attack > .07 ? attackRect() : null;
   if (hitbox && overlap(hitbox, midBoss) && midBoss.lastAttack !== player.attackId) {
-    const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+    const attackPower = getAttackPower();
     midBoss.lastAttack = player.attackId;
     midBoss.hp -= attackPower;
     midBoss.hit = .16;
@@ -1117,12 +1426,13 @@ function updateMidBoss(dt) {
       midBoss.dead = true;
       midBoss.active = false;
       save.midBossDefeated = true;
+      grantBossSigil("midBoss", "wardenPulse");
       storeSave();
       bossProjectiles.length = 0;
       spawnCoins(midBoss.x + midBoss.w / 2, midBoss.y + midBoss.h / 2, 12);
       shake = 20;
       puff(midBoss.x + 30, midBoss.y + 35, "#b9fff1", 55, 290);
-      toast("수문장을 쓰러뜨렸습니다 · 종루로 향하는 길이 열렸습니다", 3500);
+      toast("수문장 격파 · 수문장의 맥동과 인장 슬롯 +1 획득", 4200);
     }
   }
   if (overlap(player, midBoss)) hurt(1, midBoss.x + midBoss.w / 2);
@@ -1139,8 +1449,8 @@ function defeatAreaBoss(areaBoss) {
   areaBoss.dead = true;
   areaBoss.active = false;
   if (!save.areaBosses.includes(areaBoss.id)) save.areaBosses.push(areaBoss.id);
-  const relic = areaBoss.kind === "moon" ? "moonGear" : "tideSigil";
-  if (!save.relics.includes(relic)) save.relics.push(relic);
+  const relic = areaBoss.kind === "moon" ? "moonGear" : "archiveCrown";
+  grantBossSigil(areaBoss.id, relic);
   storeSave();
   spawnCoins(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, 16);
   bossProjectiles.length = 0;
@@ -1148,9 +1458,23 @@ function defeatAreaBoss(areaBoss) {
   const color = areaBoss.kind === "moon" ? "#f5d77a" : "#68dfd0";
   puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, color, 65, 310);
   toast(areaBoss.kind === "moon"
-    ? "월륜의 파수꾼 격파 · 월륜 톱니 획득 · 대시 재사용 시간 감소"
-    : "먹빛 사서 격파 · 회수의 인장 획득 · 코인 흡수 범위 증가", 4400);
+    ? "월륜의 파수꾼 격파 · 월륜 톱니와 인장 슬롯 +1 획득"
+    : "먹빛 사서 격파 · 기록고의 왕관과 인장 슬롯 +1 획득", 4400);
   beep(areaBoss.kind === "moon" ? 760 : 560, .8, "sine", .065);
+}
+
+function grantBossSigil(rewardId, sigilId) {
+  if (!save.ownedSigils.includes(sigilId)) save.ownedSigils.push(sigilId);
+  if (!save.slotRewards.includes(rewardId)) {
+    save.slotRewards.push(rewardId);
+    save.sigilSlots++;
+  }
+  const sigil = sigilCatalog[sigilId];
+  if (!hasSigil(sigilId) && usedSigilSlots() + sigil.slots <= save.sigilSlots) {
+    save.equippedSigils.push(sigilId);
+  }
+  player.maxHp = getMaxHp();
+  player.hp = Math.min(player.maxHp, player.hp + 1);
 }
 
 function updateAreaBosses(dt) {
@@ -1236,7 +1560,7 @@ function updateAreaBosses(dt) {
     }
 
     if (hitbox && overlap(hitbox, areaBoss) && areaBoss.lastAttack !== player.attackId) {
-      const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+      const attackPower = getAttackPower();
       areaBoss.lastAttack = player.attackId;
       areaBoss.hp -= attackPower;
       areaBoss.hit = .17;
@@ -1305,7 +1629,7 @@ function updateBoss(dt) {
 
   const hitbox = player.attack > .07 ? attackRect() : null;
   if (hitbox && overlap(hitbox, boss) && boss.lastAttack !== player.attackId) {
-    const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+    const attackPower = getAttackPower();
     boss.lastAttack = player.attackId; boss.hp -= attackPower; boss.hit = .15; boss.vx += player.dir * 90;
     bounceFromDownwardHit(boss);
     shake = 8; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 13, 180);
@@ -1388,6 +1712,54 @@ function drawBackground() {
   for (let x = -(camera.x * .35 % 260); x < W + 260; x += 260) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.bezierCurveTo(x + 15, 140, x - 30, 270, x + 15, 410); ctx.stroke();
   }
+
+  ctx.save();
+  if (clocktower) {
+    const moonX = 748 - camera.x * .025;
+    const moonY = 105 - camera.y * .02;
+    ctx.shadowColor = "#ffe48b";
+    ctx.shadowBlur = 35;
+    ctx.fillStyle = "#e8d889";
+    ctx.fillRect(Math.round(moonX - 25), Math.round(moonY - 25), 50, 50);
+    ctx.fillStyle = "#11152c";
+    ctx.fillRect(Math.round(moonX - 8), Math.round(moonY - 28), 35, 55);
+    ctx.shadowBlur = 0;
+    for (let x = -40 - (camera.x * .18 % 140); x < W + 80; x += 140) {
+      const y = 190 + Math.sin(x * .03) * 30;
+      ctx.strokeStyle = "rgba(231,202,104,.22)";
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x, y, 34, 0, Math.PI * 2); ctx.stroke();
+      for (let tooth = 0; tooth < 8; tooth++) {
+        const angle = tooth * Math.PI / 4 + time * .08;
+        ctx.fillStyle = "rgba(231,202,104,.18)";
+        ctx.fillRect(Math.round(x + Math.cos(angle) * 39 - 3), Math.round(y + Math.sin(angle) * 39 - 3), 6, 6);
+      }
+    }
+  } else if (archive) {
+    for (let x = -60 - (camera.x * .12 % 190); x < W + 100; x += 190) {
+      const beam = ctx.createLinearGradient(x, 0, x + 110, H);
+      beam.addColorStop(0, "rgba(82,224,205,.13)");
+      beam.addColorStop(1, "rgba(82,224,205,0)");
+      ctx.fillStyle = beam;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 55, 0); ctx.lineTo(x + 180, H); ctx.lineTo(x + 90, H); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(104,220,207,.18)";
+    ctx.lineWidth = 2;
+    for (let y = 135; y < H; y += 78) {
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 20) ctx.lineTo(x, y + Math.sin(x * .025 + time * 1.3 + y) * 7);
+      ctx.stroke();
+    }
+  } else {
+    for (let x = 35 - (camera.x * .16 % 120); x < W; x += 120) {
+      const y = 110 + (x * 17 % 210);
+      ctx.fillStyle = `rgba(145,223,255,${.08 + Math.sin(time * 2 + x) * .025})`;
+      ctx.fillRect(Math.round(x), Math.round(y), 3, 3);
+      ctx.fillRect(Math.round(x - 5), Math.round(y + 1), 3, 1);
+      ctx.fillRect(Math.round(x + 5), Math.round(y + 1), 3, 1);
+    }
+  }
+  ctx.restore();
 }
 
 function drawWorld() {
@@ -1710,35 +2082,45 @@ function drawWorld() {
     }
   }
 
-  // merchant
-  ctx.save();
-  ctx.translate(merchant.x + merchant.w / 2, merchant.y + merchant.h / 2);
-  ctx.fillStyle = "#42354b";
-  ctx.beginPath();
-  ctx.ellipse(0, 10, 18, 24, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#d9c9b1";
-  ctx.beginPath();
-  ctx.ellipse(0, -10, 12, 14, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#c6a66a";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(-13, -17);
-  ctx.quadraticCurveTo(0, -33, 15, -16);
-  ctx.stroke();
-  ctx.fillStyle = "#ffe3a2";
-  ctx.beginPath();
-  ctx.arc(0, -9, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  if (Math.abs(player.x + player.w / 2 - (merchant.x + merchant.w / 2)) < 70 && player.y > 375) {
-    ctx.fillStyle = "rgba(7,10,18,.82)";
-    ctx.fillRect(merchant.x - 60, merchant.y - 40, 160, 30);
-    ctx.fillStyle = "#ffe1a3";
-    ctx.font = "bold 15px system-ui";
-    ctx.fillText("↓ 상점 열기", merchant.x - 16, merchant.y - 20);
-  }
+  // regional sigil merchants
+  vendors.forEach((vendor, index) => {
+    ctx.save();
+    ctx.translate(vendor.x + vendor.w / 2, vendor.y + vendor.h / 2);
+    ctx.shadowColor = vendor.color;
+    ctx.shadowBlur = 13 + Math.sin(time * 3 + index) * 3;
+    ctx.fillStyle = index === 0 ? "#42354b" : index === 1 ? "#403825" : "#173d42";
+    ctx.fillRect(-17, -4, 34, 29);
+    ctx.fillStyle = index === 0 ? "#d9c9b1" : index === 1 ? "#d9c47f" : "#92d6ca";
+    ctx.fillRect(-10, -21, 20, 18);
+    ctx.fillStyle = vendor.color;
+    ctx.fillRect(-3, -15, 3, 3);
+    ctx.fillRect(4, -15, 3, 3);
+    ctx.strokeStyle = vendor.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    if (index === 0) {
+      ctx.moveTo(-14, -22); ctx.quadraticCurveTo(0, -36, 16, -21);
+    } else if (index === 1) {
+      ctx.arc(0, -18, 18, Math.PI, 0);
+      for (let tooth = -12; tooth <= 12; tooth += 8) ctx.rect(tooth, -36, 4, 6);
+    } else {
+      ctx.moveTo(-17, -28); ctx.lineTo(0, -36); ctx.lineTo(17, -28);
+      ctx.moveTo(-13, 18); ctx.quadraticCurveTo(0, 29, 13, 18);
+    }
+    ctx.stroke();
+    ctx.restore();
+    const nearVendor = Math.abs(player.x + player.w / 2 - (vendor.x + vendor.w / 2)) < 72
+      && Math.abs(player.y + player.h / 2 - (vendor.y + vendor.h / 2)) < 82;
+    if (nearVendor) {
+      ctx.fillStyle = "rgba(7,10,18,.88)";
+      ctx.fillRect(vendor.x - 66, vendor.y - 43, 170, 30);
+      ctx.fillStyle = vendor.color;
+      ctx.font = "bold 15px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("↓ 인장 상점 열기", vendor.x + 18, vendor.y - 22);
+      ctx.textAlign = "left";
+    }
+  });
 
   enemies.forEach(drawEnemy);
   if (midBoss && !midBoss.dead) drawMidBoss();
@@ -1805,7 +2187,9 @@ function drawWorld() {
 
   particles.forEach(p => {
     ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
-    ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = p.color;
+    const size = Math.max(2, Math.round(p.r * 1.6));
+    ctx.fillRect(Math.round(p.x - size / 2), Math.round(p.y - size / 2), size, size);
   });
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -2019,6 +2403,20 @@ function drawBoss() {
 function drawPlayer() {
   if (player.respawning > 0) return;
   ctx.save(); ctx.translate(player.x + player.w / 2, player.y + player.h / 2); ctx.scale(player.dir, 1);
+  save.equippedSigils.slice(0, 8).forEach((id, index, equipped) => {
+    const angle = time * (1.25 + index % 2 * .22) + index * Math.PI * 2 / equipped.length;
+    const radius = 28 + (index % 2) * 7;
+    const sigil = sigilCatalog[id];
+    const sx = Math.round(Math.cos(angle) * radius);
+    const sy = Math.round(Math.sin(angle) * 15);
+    ctx.globalAlpha = .75;
+    ctx.shadowColor = sigil.color;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = sigil.color;
+    ctx.fillRect(sx - 2, sy - 2, 5, 5);
+  });
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
   if (player.inv > 0 && Math.floor(player.inv * 12) % 2) ctx.globalAlpha = .35;
   if (player.dash > 0) {
     ctx.globalAlpha = .18; ctx.fillStyle = "#9b8cff";
@@ -2043,16 +2441,17 @@ function drawPlayer() {
   if (player.attack > 0) {
     const t = 1 - player.attack / .22;
     const improved = save.shopItems.includes("weapon");
+    const sigilReach = sigilStats().reach;
     ctx.strokeStyle = improved ? "#ffe2a0" : "#dff9ff";
     ctx.shadowColor = improved ? "#ffbd55" : "#8cecff";
     ctx.shadowBlur = 12; ctx.lineWidth = improved ? 6 : 5;
     ctx.beginPath();
     if (player.attackDir === "up") {
-      ctx.arc(0, -8, improved ? 42 : 36, Math.PI * (1.08 + t * .18), Math.PI * (1.92 + t * .18));
+      ctx.arc(0, -8, (improved ? 42 : 36) + sigilReach * .45, Math.PI * (1.08 + t * .18), Math.PI * (1.92 + t * .18));
     } else if (player.attackDir === "down") {
-      ctx.arc(0, 10, improved ? 42 : 36, Math.PI * (.08 + t * .18), Math.PI * (.92 + t * .18));
+      ctx.arc(0, 10, (improved ? 42 : 36) + sigilReach * .45, Math.PI * (.08 + t * .18), Math.PI * (.92 + t * .18));
     } else {
-      ctx.arc(9, 1, improved ? 40 : 34, -1.4 + t * .7, .8 + t * .7);
+      ctx.arc(9, 1, (improved ? 40 : 34) + sigilReach * .45, -1.4 + t * .7, .8 + t * .7);
     }
     ctx.stroke(); ctx.shadowBlur = 0;
   }
@@ -2121,27 +2520,74 @@ function drawHUD() {
       : activeBoss === midBoss ? "청록 수문장" : activeBoss.name, W / 2, y - 7);
   }
 
-  if (save.relics.length) {
-    ctx.textAlign = "right";
-    ctx.font = "14px system-ui";
-    ctx.fillStyle = "rgba(225,236,242,.72)";
-    const relicNames = [
-      save.relics.includes("moonGear") ? "⚙ 월륜 톱니" : "",
-      save.relics.includes("tideSigil") ? "◉ 회수의 인장" : ""
-    ].filter(Boolean).join("  ");
-    ctx.fillText(relicNames, W - 25, 102);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(5,9,18,.72)";
+  ctx.fillRect(W - 181, 66, 157, 32);
+  ctx.font = "bold 14px system-ui";
+  ctx.fillStyle = usedSigilSlots() ? "#ffdc91" : "#718096";
+  ctx.fillText(`인장  ${usedSigilSlots()} / ${save.sigilSlots}  ·  I`, W - 36, 88);
+  ctx.restore();
+}
+
+function drawScreenAtmosphere() {
+  const clocktower = player.y < -900;
+  const archive = player.y > 1000;
+  ctx.save();
+  for (let i = 0; i < 34; i++) {
+    const seed = i * 73.17;
+    if (clocktower) {
+      const x = (seed * 7 + time * (12 + i % 4) - camera.x * .03) % (W + 30) - 15;
+      const y = (seed * 3.1 + Math.sin(time + i) * 18) % H;
+      ctx.globalAlpha = .18 + (i % 3) * .08;
+      ctx.fillStyle = i % 3 ? "#f1d471" : "#a99be2";
+      ctx.fillRect(Math.round(x), Math.round(y), i % 5 === 0 ? 5 : 3, i % 5 === 0 ? 5 : 3);
+    } else if (archive) {
+      const x = (seed * 5.3 + Math.sin(time * .8 + i) * 30) % W;
+      const y = H - ((seed * 2.4 + time * (22 + i % 6)) % (H + 20));
+      ctx.globalAlpha = .12 + (i % 4) * .05;
+      ctx.strokeStyle = i % 2 ? "#7ce5d7" : "#69aace";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(Math.round(x), Math.round(y), 3 + i % 5, 3 + i % 5);
+    } else {
+      const x = (seed * 4.9 + Math.sin(time * .45 + i) * 24 - camera.x * .02) % W;
+      const y = (seed * 2.8 + time * (7 + i % 3)) % H;
+      ctx.globalAlpha = .1 + (i % 5) * .035;
+      ctx.fillStyle = i % 3 ? "#8ed9c6" : "#93c8ff";
+      ctx.fillRect(Math.round(x), Math.round(y), 4 + i % 3, 2 + i % 2);
+      if (i % 4 === 0) ctx.fillRect(Math.round(x + 3), Math.round(y - 2), 2, 2);
+    }
   }
+  ctx.restore();
+}
+
+function drawPixelFinish() {
+  ctx.save();
+  ctx.globalAlpha = .055;
+  ctx.fillStyle = "#a8d8ff";
+  for (let y = 1; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+  ctx.globalAlpha = .16;
+  const vignette = ctx.createRadialGradient(W / 2, H / 2, H * .2, W / 2, H / 2, W * .64);
+  vignette.addColorStop(0, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, "rgba(0,0,12,.95)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = .18;
+  ctx.strokeStyle = player.y < -900 ? "#dbc76c" : player.y > 1000 ? "#54c9bd" : "#709bc7";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(7, 7, W - 14, H - 14);
+  [[10, 10], [W - 18, 10], [10, H - 18], [W - 18, H - 18]].forEach(([x, y]) => ctx.fillRect(x, y, 8, 8));
   ctx.restore();
 }
 
 function render() {
   ctx.save();
   if (shake > .2) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
-  drawBackground(); drawWorld(); drawHUD();
+  drawBackground(); drawWorld(); drawScreenAtmosphere(); drawHUD();
   if (player.respawning > 0) {
     ctx.fillStyle = `rgba(2,4,9,${clamp(player.respawning, 0, .75)})`; ctx.fillRect(0, 0, W, H);
   }
   ctx.restore();
+  drawPixelFinish();
 }
 
 function win() {
@@ -2169,7 +2615,7 @@ function loop(now, generation) {
   if (!running || paused || generation !== loopGeneration) return;
   const dt = Math.min((now - last) / 1000, .033);
   last = now;
-  if (!shopOpen) update(dt);
+  if (!shopOpen && !inventoryOpen) update(dt);
   else taps.clear();
   render();
   animationFrameId = requestAnimationFrame(nextNow => loop(nextNow, generation));

@@ -35,25 +35,38 @@
         <button class="reset-button" data-reset-game type="button">진행 상황 초기화</button>
       </div>
       <div id="shopScreen" class="overlay shop-overlay hidden">
-        <p class="kicker">뿌리 상인의 작업대</p>
-        <h2>방랑자의 상점</h2>
+        <p id="shopKicker" class="kicker">뿌리 상인의 작업대</p>
+        <h2 id="shopTitle">방랑자의 상점</h2>
         <p class="shop-wallet">보유 코인 <strong id="shopCoins">0</strong> ◈</p>
-        <div class="shop-grid">
-          <button type="button" data-shop-item="weapon">
-            <span>새벽의 칼날</span><small>공격력 +1</small><b>8 ◈</b>
-          </button>
-          <button type="button" data-shop-item="armor">
-            <span>이끼 갑옷</span><small>최대 체력 +1</small><b>10 ◈</b>
-          </button>
-          <button type="button" data-shop-item="doubleJump">
-            <span>나방의 날개</span><small>공중에서 Z로 한 번 더 점프</small><b>12 ◈</b>
-          </button>
-          <button type="button" data-shop-item="bellKey">
-            <span>종루의 열쇠</span><small>모든 메아리·장비와 수문장 처치 필요</small><b>6 ◈</b>
-          </button>
-        </div>
+        <div id="shopGrid" class="shop-grid"></div>
         <p id="shopMessage" class="shop-message">방향키로 선택 · Z 구매 · A 나가기</p>
         <p class="shop-exit-hint"><kbd>방향키</kbd> 선택 · <kbd>Z</kbd> 구매 · <kbd>A</kbd> 나가기</p>
+      </div>
+      <div id="inventoryScreen" class="overlay inventory-overlay hidden">
+        <div class="inventory-heading">
+          <div>
+            <p class="kicker">방랑자의 가방</p>
+            <h2>인벤토리</h2>
+          </div>
+          <div class="slot-counter">
+            인장 슬롯 <strong id="sigilSlotCount">0 / 3</strong>
+            <div id="sigilSlotPips" class="slot-pips" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="inventory-layout">
+          <section class="equipment-panel">
+            <h3>장비와 능력</h3>
+            <div id="equipmentList" class="equipment-list"></div>
+          </section>
+          <section class="sigil-panel">
+            <div class="sigil-panel-heading">
+              <h3>보유 인장</h3>
+              <span id="sigilOwnedCount">0 / 30</span>
+            </div>
+            <div id="sigilGrid" class="sigil-grid"></div>
+          </section>
+        </div>
+        <p id="inventoryMessage" class="inventory-message">방향키로 선택 · Z 장착/해제 · I 또는 A 닫기</p>
       </div>
       <div id="toast" role="status" aria-live="polite"></div>
     </section>
@@ -64,6 +77,7 @@
       <div><kbd>Z</kbd><span>점프</span></div>
       <div><kbd>X</kbd><span>공격</span></div>
       <div><kbd>C</kbd><span>대시</span></div>
+      <div><kbd>I</kbd><span>인벤토리</span></div>
       <div><kbd>A</kbd><span>상점 나가기</span></div>
       <div><kbd>Esc</kbd><span>일시정지</span></div>
     </section>
