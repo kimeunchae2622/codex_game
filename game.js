@@ -20,6 +20,7 @@ let shake = 0;
 let toastTimer = 0;
 let soundOn = false;
 let audio;
+let platformHintShown = false;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -73,6 +74,21 @@ const platforms = [
   { x: 4710, y: 370, w: 155, h: 18 }
 ];
 
+const movingPlatforms = [
+  { x: 615, y: 358, w: 92, h: 16, baseX: 615, baseY: 358, axis: "y", range: 65, speed: 1.25, phase: 0, dx: 0, dy: 0, moving: true },
+  { x: 2247, y: 338, w: 96, h: 16, baseX: 2247, baseY: 338, axis: "x", range: 55, speed: 1.05, phase: 1.8, dx: 0, dy: 0, moving: true },
+  { x: 2910, y: 342, w: 90, h: 16, baseX: 2910, baseY: 342, axis: "y", range: 78, speed: 1.4, phase: 3.1, dx: 0, dy: 0, moving: true },
+  { x: 3992, y: 315, w: 100, h: 16, baseX: 3992, baseY: 315, axis: "x", range: 70, speed: 1.15, phase: 4.4, dx: 0, dy: 0, moving: true }
+];
+
+const crumblePlatforms = [
+  { x: 520, y: 314, w: 82, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 1450, y: 338, w: 76, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 2290, y: 262, w: 84, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 2860, y: 382, w: 72, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 4025, y: 235, w: 88, h: 15, timer: 0, gone: 0, crumble: true }
+];
+
 const spikes = [
   { x: 620, y: 455, w: 80, h: 20 }, { x: 1460, y: 455, w: 65, h: 20 },
   { x: 2245, y: 455, w: 95, h: 20 }, { x: 2910, y: 455, w: 90, h: 20 },
@@ -108,6 +124,10 @@ function resetEntities() {
     x: 4590, y: 367, w: 82, h: 108, hp: 16, maxHp: 16, dir: -1,
     active: false, dead: false, hit: 0, attack: 0, jump: 0, vx: 0, vy: 0, lastAttack: -1
   };
+  crumblePlatforms.forEach(p => {
+    p.timer = 0;
+    p.gone = 0;
+  });
 }
 resetEntities();
 
@@ -192,7 +212,11 @@ function moveAndCollide(dt) {
   }
 
   player.x += player.vx * dt;
-  const solids = [...platforms];
+  const solids = [
+    ...platforms,
+    ...movingPlatforms,
+    ...crumblePlatforms.filter(p => p.gone <= 0)
+  ];
   if (!save.opened) solids.push({ x: 3978, y: 150, w: 34, h: 325, gate: true });
   for (const p of solids) {
     if (!overlap(player, p)) continue;
@@ -211,6 +235,8 @@ function moveAndCollide(dt) {
       player.vy = 0;
       player.grounded = true;
       player.coyote = .1;
+      if (p.moving) player.x += p.dx;
+      if (p.crumble && p.timer === 0) p.timer = .001;
     } else if (player.vy < 0) {
       player.y = p.y + p.h;
       player.vy = 40;
@@ -249,6 +275,37 @@ function attackRect() {
   return { x: player.dir > 0 ? player.x + 20 : player.x - 48, y: player.y + 5, w: 56, h: 36 };
 }
 
+function updatePlatforms(dt) {
+  movingPlatforms.forEach(p => {
+    const oldX = p.x;
+    const oldY = p.y;
+    const offset = Math.sin(time * p.speed + p.phase) * p.range;
+    p.x = p.baseX + (p.axis === "x" ? offset : 0);
+    p.y = p.baseY + (p.axis === "y" ? offset : 0);
+    p.dx = p.x - oldX;
+    p.dy = p.y - oldY;
+  });
+
+  crumblePlatforms.forEach(p => {
+    if (p.gone > 0) {
+      p.gone -= dt;
+      if (p.gone <= 0) {
+        p.gone = 0;
+        p.timer = 0;
+        puff(p.x + p.w / 2, p.y, "#718ca3", 6, 70);
+      }
+    } else if (p.timer > 0) {
+      p.timer += dt;
+      if (p.timer > .62) {
+        p.gone = 2.2;
+        p.timer = 0;
+        puff(p.x + p.w / 2, p.y + 7, "#63788b", 13, 110);
+        beep(135, .1, "triangle", .025);
+      }
+    }
+  });
+}
+
 function updatePlayer(dt) {
   player.inv -= dt; player.attack -= dt; player.dash -= dt; player.dashCool -= dt;
   player.coyote -= dt; player.jumpBuffer -= dt;
@@ -277,6 +334,11 @@ function updatePlayer(dt) {
 
   player.look = lerp(player.look, down("ArrowUp") ? -1 : down("ArrowDown") ? 1 : 0, 1 - Math.pow(.005, dt));
   moveAndCollide(dt);
+
+  if (!platformHintShown && player.x > 430) {
+    platformHintShown = true;
+    toast("빛나는 발판은 움직이고, 갈라진 발판은 곧 무너집니다", 3200);
+  }
 
   for (const s of spikes) if (overlap(player, s)) hurt(1, s.x + s.w / 2);
   if (player.y > H + 120) respawn();
@@ -374,6 +436,7 @@ function updateBoss(dt) {
 
 function update(dt) {
   time += dt;
+  updatePlatforms(dt);
   updatePlayer(dt);
   updateEnemies(dt);
   updateBoss(dt);
@@ -442,6 +505,40 @@ function drawWorld() {
     for (let x = p.x + 18; x < p.x + p.w; x += 42) {
       ctx.beginPath(); ctx.moveTo(x, p.y + 7); ctx.lineTo(x - 8, Math.min(H, p.y + 38)); ctx.stroke();
     }
+  });
+
+  movingPlatforms.forEach(p => {
+    ctx.save();
+    ctx.shadowColor = "#78dff0";
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "#29475a";
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = "#8be8ef";
+    ctx.fillRect(p.x + 5, p.y, p.w - 10, 3);
+    ctx.strokeStyle = "#456b79";
+    ctx.beginPath();
+    ctx.moveTo(p.x + 12, p.y + 8);
+    ctx.lineTo(p.x + p.w - 12, p.y + 8);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  crumblePlatforms.forEach(p => {
+    if (p.gone > 0) return;
+    const jitter = p.timer > 0 ? Math.sin(time * 48) * 2 : 0;
+    ctx.save();
+    ctx.translate(jitter, 0);
+    ctx.fillStyle = p.timer > 0 ? "#6d6571" : "#344353";
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.strokeStyle = "#8190a0";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.w * .28, p.y);
+    ctx.lineTo(p.x + p.w * .43, p.y + p.h);
+    ctx.moveTo(p.x + p.w * .7, p.y);
+    ctx.lineTo(p.x + p.w * .58, p.y + p.h);
+    ctx.stroke();
+    ctx.restore();
   });
 
   spikes.forEach(s => {
