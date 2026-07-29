@@ -11,7 +11,7 @@ const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
 const WORLD_W = 6200;
-const WORLD_TOP = -1120;
+const WORLD_TOP = -1370;
 const WORLD_BOTTOM = 1450;
 const FLOOR = 475;
 
@@ -139,11 +139,14 @@ const platforms = [
   { x: 3430, y: -620, w: 125, h: 16 },
   { x: 3585, y: -695, w: 125, h: 16 },
   { x: 3740, y: -770, w: 160, h: 16 },
-  { x: 3900, y: -835, w: 1260, h: 170 },
-  { x: 4050, y: -930, w: 150, h: 18 },
-  { x: 4320, y: -995, w: 135, h: 18 },
-  { x: 4590, y: -940, w: 145, h: 18 },
-  { x: 4870, y: -1010, w: 150, h: 18 },
+  { x: 3900, y: -845, w: 125, h: 16 },
+  { x: 4055, y: -920, w: 125, h: 16 },
+  { x: 4210, y: -995, w: 150, h: 16 },
+  { x: 4360, y: -1060, w: 800, h: 170 },
+  { x: 4440, y: -1155, w: 125, h: 18 },
+  { x: 4640, y: -1220, w: 135, h: 18 },
+  { x: 4830, y: -1160, w: 145, h: 18 },
+  { x: 5000, y: -1230, w: 150, h: 18 },
 
   // beyond the roots: flooded archive
   { x: 3650, y: 1035, w: 135, h: 18 },
@@ -178,13 +181,13 @@ const spikes = [
   { x: 2245, y: 455, w: 95, h: 20 },
   { x: 3990, y: 455, w: 100, h: 20 }, { x: 5100, y: 455, w: 100, h: 20 },
   { x: 2900, y: 940, w: 100, h: 20 },
-  { x: 4310, y: -855, w: 85, h: 20 },
+  { x: 4570, y: -1080, w: 85, h: 20 },
   { x: 4320, y: 1170, w: 80, h: 20 }
 ];
 
 const checkpointData = [
   { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 },
-  { x: 4010, y: -835 }, { x: 4080, y: 1190 }
+  { x: 4010, y: -845 }, { x: 4410, y: -1060 }, { x: 4080, y: 1190 }
 ];
 
 const echoes = [
@@ -203,7 +206,7 @@ const enemySeeds = [
   [3315, -272, "crawler", true], [3490, -390, "flyer", true],
   [2600, 648, "crawler", true], [3080, 648, "crawler", true],
   [2820, 745, "flyer", true], [3390, 793, "crawler", true],
-  [4250, -915, "clockwork", true], [4500, -895, "clockwork", true],
+  [4590, -1115, "clockwork", true], [4770, -1125, "clockwork", true],
   [4240, 1110, "inkling", true], [4570, 1070, "inkling", true]
 ];
 let enemies = [];
@@ -233,7 +236,7 @@ function resetEntities() {
       id: i, x: e[0], y, baseY: e[1], w: width, h: height, type: e[2], hp,
       dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7,
       patrolRange: e[3] ? 54 : 90, lastAttack: -1, cooldown: .7 + i % 4 * .28,
-      vx: 0, vy: 0, action: "idle", timer: 0, attackFired: false
+      vx: 0, vy: 0, knockback: 0, action: "idle", timer: 0, attackFired: false
     };
   });
   midBoss = {
@@ -249,7 +252,7 @@ function resetEntities() {
   areaBosses = [
     {
       id: "moonKeeper", kind: "moon", name: "월륜의 파수꾼",
-      x: 4770, y: -915, baseY: -915, w: 70, h: 80, hp: 16, maxHp: 16,
+      x: 5000, y: -1170, baseY: -1170, w: 70, h: 80, hp: 16, maxHp: 16,
       active: false, dead: save.areaBosses.includes("moonKeeper"), hit: 0,
       cooldown: .8, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
@@ -779,6 +782,8 @@ function updateEnemies(dt) {
     e.hit -= dt;
     e.cooldown -= dt;
     e.timer -= dt;
+    e.x += e.knockback * dt;
+    e.knockback *= Math.pow(.008, dt);
     const playerCenterX = player.x + player.w / 2;
     const playerCenterY = player.y + player.h / 2;
     const enemyCenterX = e.x + e.w / 2;
@@ -886,9 +891,16 @@ function updateEnemies(dt) {
     }
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
       const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
-      e.lastAttack = player.attackId; e.hp -= attackPower; e.hit = .18; e.x += player.dir * 24;
+      const knockDirection = Math.sign(
+        e.x + e.w / 2 - (player.x + player.w / 2)
+      ) || player.dir;
+      e.lastAttack = player.attackId;
+      e.hp -= attackPower;
+      e.hit = .18;
+      e.knockback = knockDirection * (e.type === "clockwork" || e.type === "inkling" ? 235 : 195);
       bounceFromDownwardHit(e);
-      shake = 4; puff(e.x + e.w / 2, e.y + e.h / 2, "#baf0ff", 8, 130);
+      shake = 4;
+      puff(e.x + e.w / 2 - knockDirection * 8, e.y + e.h / 2, "#baf0ff", 11, 165);
       beep(220, .07, "square", .035);
       if (e.hp <= 0) {
         e.dead = true;
@@ -1027,7 +1039,9 @@ function updateBossProjectiles(dt) {
 }
 
 function updateMidBoss(dt) {
-  if (save.opened && player.x > 4140 && !midBoss.dead) midBoss.active = true;
+  const playerOnMidBossFloor = player.y > 120 && player.y < 560;
+  if (save.opened && player.x > 4140 && playerOnMidBossFloor && !midBoss.dead) midBoss.active = true;
+  if (!playerOnMidBossFloor) midBoss.active = false;
   if (!midBoss.active || midBoss.dead) return;
   midBoss.hit -= dt;
   midBoss.cooldown -= dt;
@@ -1127,7 +1141,7 @@ function updateAreaBosses(dt) {
   areaBosses.forEach(areaBoss => {
     if (areaBoss.dead) return;
     const insideRegion = areaBoss.kind === "moon"
-      ? player.y < -700 && player.x > 4400
+      ? player.y < -920 && player.x > 4650
       : player.y > 1000 && player.x > 4400;
     if (insideRegion) areaBoss.active = true;
     if (!areaBoss.active) return;
@@ -1146,7 +1160,7 @@ function updateAreaBosses(dt) {
         }
       } else {
         areaBoss.y = areaBoss.baseY + Math.sin(time * 2.2) * 26;
-        areaBoss.x = clamp(areaBoss.x, 4460, 5050);
+        areaBoss.x = clamp(areaBoss.x, 4660, 5070);
         if (areaBoss.cooldown <= 0) {
           areaBoss.cycle++;
           if (areaBoss.cycle % 2) {
@@ -1313,7 +1327,7 @@ function roundRect(x, y, w, h, r) {
 }
 
 function drawBackground() {
-  const clocktower = player.y < -600;
+  const clocktower = player.y < -900;
   const archive = player.y > 1000;
   const palette = clocktower
     ? ["#11152c", "#0c1023", "#070918"]
@@ -1404,34 +1418,34 @@ function drawWorld() {
   ctx.strokeStyle = "rgba(232,205,114,.22)";
   ctx.lineWidth = 8;
   ctx.beginPath();
-  ctx.arc(4550, -1035, 150, 0, Math.PI * 2);
+  ctx.arc(4800, -1260, 150, 0, Math.PI * 2);
   ctx.stroke();
   ctx.lineWidth = 3;
   for (let i = 0; i < 12; i++) {
     const angle = i * Math.PI / 6;
     ctx.beginPath();
-    ctx.moveTo(4550 + Math.cos(angle) * 126, -1035 + Math.sin(angle) * 126);
-    ctx.lineTo(4550 + Math.cos(angle) * 145, -1035 + Math.sin(angle) * 145);
+    ctx.moveTo(4800 + Math.cos(angle) * 126, -1260 + Math.sin(angle) * 126);
+    ctx.lineTo(4800 + Math.cos(angle) * 145, -1260 + Math.sin(angle) * 145);
     ctx.stroke();
   }
   ctx.beginPath();
-  ctx.moveTo(4550, -1035);
-  ctx.lineTo(4550 + Math.cos(time * .18) * 92, -1035 + Math.sin(time * .18) * 92);
-  ctx.moveTo(4550, -1035);
-  ctx.lineTo(4550 + Math.cos(-time * .35) * 64, -1035 + Math.sin(-time * .35) * 64);
+  ctx.moveTo(4800, -1260);
+  ctx.lineTo(4800 + Math.cos(time * .18) * 92, -1260 + Math.sin(time * .18) * 92);
+  ctx.moveTo(4800, -1260);
+  ctx.lineTo(4800 + Math.cos(-time * .35) * 64, -1260 + Math.sin(-time * .35) * 64);
   ctx.stroke();
-  for (let x = 3980; x <= 5100; x += 220) {
+  for (let x = 4400; x <= 5100; x += 175) {
     ctx.beginPath();
-    ctx.moveTo(x, -1120);
-    ctx.lineTo(x, -835);
+    ctx.moveTo(x, -1370);
+    ctx.lineTo(x, -1060);
     ctx.stroke();
   }
   ctx.fillStyle = "rgba(255,229,150,.78)";
   ctx.font = "bold 20px system-ui";
-  ctx.fillText("달빛 시계탑", 3995, -875);
+  ctx.fillText("달빛 시계탑", 4400, -1100);
   ctx.fillStyle = "rgba(255,236,178,.62)";
   ctx.font = "15px system-ui";
-  ctx.fillText("수관 너머, 멈춘 달의 시간이 흐르는 곳", 3995, -856);
+  ctx.fillText("수관 너머, 멈춘 달의 시간이 흐르는 곳", 4400, -1080);
   ctx.restore();
 
   // flooded archive
@@ -1464,6 +1478,89 @@ function drawWorld() {
   ctx.fillStyle = "rgba(160,224,220,.62)";
   ctx.font = "15px system-ui";
   ctx.fillText("뿌리 아래, 잊힌 문장이 물속을 떠도는 곳", 4020, 1178);
+  ctx.restore();
+
+  // layered ornaments: luminous garden, canopy, roots, gears and drifting records
+  ctx.save();
+  for (let x = 140; x < WORLD_W; x += 185) {
+    const groundY = supportTopAt(x, FLOOR);
+    if (groundY < 300 || groundY > 500) continue;
+    const sway = Math.sin(time * 1.7 + x * .013) * 5;
+    const hue = Math.floor(x / 185) % 3;
+    ctx.strokeStyle = hue === 0 ? "#4c8b79" : hue === 1 ? "#596f94" : "#6c5f8d";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY);
+    ctx.quadraticCurveTo(x + sway, groundY - 18, x + sway * .6, groundY - 34);
+    ctx.stroke();
+    ctx.fillStyle = hue === 0 ? "#91efca" : hue === 1 ? "#9cdcff" : "#d0a8ff";
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 10;
+    for (let petal = 0; petal < 4; petal++) {
+      const angle = petal * Math.PI / 2 + time * .08;
+      ctx.beginPath();
+      ctx.ellipse(x + sway * .6 + Math.cos(angle) * 6, groundY - 34 + Math.sin(angle) * 6, 4, 2.5, angle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  for (let x = 3280; x <= 3650; x += 62) {
+    const leafY = 250 - ((x - 3280) % 310);
+    ctx.fillStyle = `rgba(118,210,164,${.22 + (x % 3) * .08})`;
+    ctx.beginPath();
+    ctx.ellipse(x + Math.sin(time + x) * 7, leafY, 18, 7, -.55, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (let x = 2390; x <= 3600; x += 90) {
+    for (let i = 0; i < 3; i++) {
+      const rootY = 650 + ((x * .7 + i * 83) % 270);
+      ctx.fillStyle = i % 2 ? "rgba(181,120,214,.28)" : "rgba(96,190,173,.25)";
+      ctx.beginPath();
+      ctx.arc(x + Math.sin(time * .8 + i) * 8, rootY + Math.sin(time * 1.3 + x) * 5, 3 + i, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  const decorativeGears = [
+    [4470, -1280, 42], [4610, -1135, 30], [5000, -1295, 48], [5110, -1145, 27]
+  ];
+  decorativeGears.forEach(([gearX, gearY, radius], index) => {
+    ctx.save();
+    ctx.translate(gearX, gearY);
+    ctx.rotate(time * (index % 2 ? -.18 : .14));
+    ctx.strokeStyle = "rgba(242,211,116,.32)";
+    ctx.lineWidth = 4;
+    for (let tooth = 0; tooth < 10; tooth++) {
+      const angle = tooth * Math.PI / 5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      ctx.lineTo(Math.cos(angle) * (radius + 10), Math.sin(angle) * (radius + 10));
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius * .38, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  for (let i = 0; i < 16; i++) {
+    const pageX = 4020 + (i * 83) % 1110;
+    const pageY = 970 + (i * 47) % 180 + Math.sin(time * .7 + i) * 11;
+    ctx.save();
+    ctx.translate(pageX, pageY);
+    ctx.rotate(Math.sin(time * .9 + i) * .35);
+    ctx.fillStyle = i % 2 ? "rgba(167,229,218,.2)" : "rgba(198,211,188,.18)";
+    ctx.fillRect(-8, -5, 16, 10);
+    ctx.strokeStyle = "rgba(128,215,207,.28)";
+    ctx.beginPath();
+    ctx.moveTo(-5, -1); ctx.lineTo(5, -1);
+    ctx.moveTo(-5, 2); ctx.lineTo(3, 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 
   platforms.forEach(p => {
@@ -1954,7 +2051,7 @@ function drawHUD() {
     ctx.strokeRect(W - 67 + i * 14, 29, 7, 7);
   }
 
-  const room = player.y < -600 ? "달빛 시계탑"
+  const room = player.y < -900 ? "달빛 시계탑"
     : player.y < 100 ? "빛의 수관"
       : player.y > 1000 ? "침수된 기록고"
         : player.y > 600 ? "가라앉은 뿌리"
