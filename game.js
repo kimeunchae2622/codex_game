@@ -548,6 +548,16 @@ function attackRect() {
   return { x: player.dir > 0 ? player.x + 20 : player.x - (improved ? 58 : 48), y: player.y + 5, w: reach, h: 36 };
 }
 
+function bounceFromDownwardHit(target) {
+  const playerFeet = player.y + player.h;
+  const struckFromAbove = playerFeet <= target.y + target.h * .7;
+  if (player.attackDir !== "down" || !struckFromAbove) return;
+  player.vy = -335;
+  player.grounded = false;
+  player.coyote = 0;
+  puff(player.x + player.w / 2, player.y + player.h, "#c9f4ff", 9, 115);
+}
+
 function updatePlatforms(dt) {
   const ridingPlatform = movingPlatforms.find(p => {
     const playerFeet = player.y + player.h;
@@ -744,6 +754,7 @@ function updateEnemies(dt) {
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
       const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
       e.lastAttack = player.attackId; e.hp -= attackPower; e.hit = .18; e.x += player.dir * 24;
+      bounceFromDownwardHit(e);
       shake = 4; puff(e.x + e.w / 2, e.y + e.h / 2, "#baf0ff", 8, 130);
       beep(220, .07, "square", .035);
       if (e.hp <= 0) {
@@ -935,6 +946,7 @@ function updateMidBoss(dt) {
     midBoss.hp -= attackPower;
     midBoss.hit = .16;
     midBoss.vx += player.dir * 75;
+    bounceFromDownwardHit(midBoss);
     shake = 6;
     puff(midBoss.x + midBoss.w / 2, midBoss.y + 30, "#8ce4df", 11, 160);
     if (midBoss.hp <= 0) {
@@ -1065,6 +1077,7 @@ function updateAreaBosses(dt) {
       areaBoss.hp -= attackPower;
       areaBoss.hit = .17;
       areaBoss.x += player.dir * 34;
+      bounceFromDownwardHit(areaBoss);
       shake = 6;
       puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2,
         areaBoss.kind === "moon" ? "#f4d477" : "#67dbcf", 12, 170);
@@ -1130,6 +1143,7 @@ function updateBoss(dt) {
   if (hitbox && overlap(hitbox, boss) && boss.lastAttack !== player.attackId) {
     const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
     boss.lastAttack = player.attackId; boss.hp -= attackPower; boss.hit = .15; boss.vx += player.dir * 90;
+    bounceFromDownwardHit(boss);
     shake = 8; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 13, 180);
     if (boss.hp <= 0) {
       boss.dead = true; boss.active = false; boss.vx = 0;
