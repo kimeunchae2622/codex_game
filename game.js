@@ -35,13 +35,17 @@ const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h 
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 const saveDefault = {
-  checkpoint: 90, dash: false, echoes: [], memories: [], defeated: [],
+  checkpoint: 90, dash: false, echoes: [], defeated: [],
   coins: 0, lostCoins: null, shopItems: [], opened: false, midBossDefeated: false
 };
 let save = loadSave();
 
 function loadSave() {
-  try { return { ...saveDefault, ...JSON.parse(localStorage.getItem("forgottenGarden") || "{}") }; }
+  try {
+    const loaded = { ...saveDefault, ...JSON.parse(localStorage.getItem("forgottenGarden") || "{}") };
+    delete loaded.memories;
+    return loaded;
+  }
   catch { return { ...saveDefault }; }
 }
 function storeSave() { localStorage.setItem("forgottenGarden", JSON.stringify(save)); }
@@ -49,8 +53,8 @@ function storeSave() { localStorage.setItem("forgottenGarden", JSON.stringify(sa
 const player = {
   x: save.checkpoint, y: 380, w: 28, h: 43, vx: 0, vy: 0, dir: 1,
   grounded: false, coyote: 0, jumpBuffer: 0, airJumps: 0,
-  hp: 4 + Math.ceil(save.memories.length / 2) + (save.shopItems.includes("armor") ? 1 : 0),
-  maxHp: 4 + Math.ceil(save.memories.length / 2) + (save.shopItems.includes("armor") ? 1 : 0),
+  hp: 4 + (save.shopItems.includes("armor") ? 1 : 0),
+  maxHp: 4 + (save.shopItems.includes("armor") ? 1 : 0),
   inv: 0, attack: 0, attackId: 0, attackDir: "side", dash: 0, dashCool: 0,
   look: 0, respawning: 0
 };
@@ -163,12 +167,6 @@ const echoes = [
   { id: "별", x: 3395, y: 323 }
 ];
 
-const memoryBlooms = [
-  { id: "새벽", x: 429, y: 372 },
-  { id: "물결", x: 918, y: 387 },
-  { id: "심연", x: 2505, y: 377 }
-];
-
 const enemySeeds = [
   [520, 432, "crawler"], [880, 349, "crawler"], [1260, 432, "crawler"],
   [1640, 311, "crawler"], [2020, 420, "flyer"], [2480, 331, "crawler"],
@@ -190,7 +188,7 @@ function supportTopAt(x) {
 }
 
 function getMaxHp() {
-  return 4 + Math.ceil(save.memories.length / 2) + (save.shopItems.includes("armor") ? 1 : 0);
+  return 4 + (save.shopItems.includes("armor") ? 1 : 0);
 }
 
 function resetEntities() {
@@ -284,8 +282,8 @@ function buyShopItem(id) {
   if (!item || save.shopItems.includes(id)) return;
   if (id === "bellKey") {
     const gearReady = ["weapon", "armor", "doubleJump"].every(itemId => save.shopItems.includes(itemId));
-    if (!gearReady || save.echoes.length < 3 || save.memories.length < 3 || !save.midBossDefeated) {
-      updateShopUI("열쇠는 모든 수집품·장비와 중간 보스 처치가 필요합니다.");
+    if (!gearReady || save.echoes.length < 3 || !save.midBossDefeated) {
+      updateShopUI("열쇠는 모든 메아리·장비와 중간 보스 처치가 필요합니다.");
       return;
     }
   }
@@ -502,6 +500,15 @@ function attackRect() {
 }
 
 function updatePlatforms(dt) {
+  const ridingPlatform = movingPlatforms.find(p => {
+    const playerFeet = player.y + player.h;
+    const horizontallySupported = player.x + player.w > p.x + 2
+      && player.x < p.x + p.w - 2;
+    return player.vy >= 0
+      && horizontallySupported
+      && Math.abs(playerFeet - p.y) <= 4;
+  });
+
   movingPlatforms.forEach(p => {
     const oldX = p.x;
     const oldY = p.y;
@@ -511,6 +518,11 @@ function updatePlatforms(dt) {
     p.dx = p.x - oldX;
     p.dy = p.y - oldY;
   });
+
+  if (ridingPlatform) {
+    player.x += ridingPlatform.dx;
+    player.y += ridingPlatform.dy;
+  }
 
   crumblePlatforms.forEach(p => {
     if (p.gone > 0) {
@@ -603,26 +615,9 @@ function updatePlayer(dt) {
 
   if (!save.dash && Math.abs(player.x - 1918) < 55 && player.y < 390) {
     save.dash = true; storeSave();
-    toast("능력 해방 · C 그림자 대시 · 지나쳐 온 기억 봉인을 깨세요", 4200);
+    toast("능력 해방 · C 그림자 대시", 3200);
     puff(1918, 315, "#aa9cff", 35, 230); beep(720, .7, "sine", .06);
   }
-
-  memoryBlooms.forEach(memory => {
-    if (save.memories.includes(memory.id)) return;
-    const seal = { x: memory.x - 18, y: memory.y - 22, w: 36, h: 44 };
-    if (player.dash > 0 && overlap(player, seal)) {
-      save.memories.push(memory.id);
-      player.maxHp = getMaxHp();
-      player.hp = player.maxHp;
-      storeSave();
-      shake = 15;
-      toast(`뿌리 기억 「${memory.id}」 해방 · 최대 체력 ${player.maxHp}`, 3300);
-      puff(memory.x, memory.y, "#ffcae6", 34, 240);
-      beep(760 + save.memories.length * 70, .65, "sine", .065);
-    } else if (!save.dash && overlap(player, seal) && tap("KeyC")) {
-      toast("보랏빛 봉인입니다 · 새로운 이동 능력이 필요합니다");
-    }
-  });
 
   echoes.forEach(e => {
     if (!save.echoes.includes(e.id) && Math.hypot(player.x + 14 - e.x, player.y + 20 - e.y) < 42) {
@@ -1095,49 +1090,6 @@ function drawWorld() {
     ctx.restore(); ctx.shadowBlur = 0;
   });
 
-  memoryBlooms.forEach((memory, i) => {
-    const restored = save.memories.includes(memory.id);
-    const float = Math.sin(time * 2.4 + i) * 3;
-    ctx.save();
-    ctx.translate(memory.x, memory.y + float);
-    if (restored) {
-      ctx.shadowColor = "#ffaad4";
-      ctx.shadowBlur = 18;
-      ctx.strokeStyle = "#f4b5d2";
-      ctx.lineWidth = 2;
-      for (let petal = 0; petal < 5; petal++) {
-        ctx.save();
-        ctx.rotate(petal * Math.PI * 2 / 5);
-        ctx.beginPath();
-        ctx.ellipse(0, -10, 4, 9, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-      ctx.fillStyle = "#fff0f7";
-      ctx.beginPath();
-      ctx.arc(0, 0, 4, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.shadowColor = "#8e78d5";
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = "#22213a";
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 17, 21, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#8979c0";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-12, -15);
-      ctx.lineTo(12, 15);
-      ctx.moveTo(12, -15);
-      ctx.lineTo(-12, 15);
-      ctx.stroke();
-      ctx.strokeRect(-18, -22, 36, 44);
-    }
-    ctx.restore();
-    ctx.shadowBlur = 0;
-  });
-
   if (!save.opened) {
     ctx.fillStyle = "#101725"; ctx.fillRect(3978, 150, 34, 325);
     ctx.strokeStyle = "#68829d"; ctx.lineWidth = 2;
@@ -1404,12 +1356,6 @@ function drawHUD() {
     ctx.strokeRect(W - 67 + i * 14, 29, 7, 7);
   }
 
-  ctx.fillStyle = "rgba(5,9,18,.65)";
-  ctx.fillRect(W - 164, 56, 140, 27);
-  ctx.fillStyle = "#cfb7d5";
-  ctx.font = "11px system-ui";
-  ctx.fillText(`뿌리 기억  ${save.memories.length} / 3`, W - 145, 74);
-
   const room = player.y < 100 ? "빛의 수관"
     : player.y > 600 ? "가라앉은 뿌리"
       : player.x < 1500 ? "이끼 낀 회랑"
@@ -1417,11 +1363,11 @@ function drawHUD() {
           : player.x < 4050 ? "별 없는 온실"
             : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(213,232,248,.65)"; ctx.font = "12px Georgia, serif"; ctx.fillText(room, W / 2, 31);
-  const explored = save.echoes.length + save.memories.length + save.shopItems.length
+  const explored = save.echoes.length + save.shopItems.length
     + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
   ctx.font = "10px system-ui";
   ctx.fillStyle = "rgba(159,183,204,.55)";
-  ctx.fillText(`정원 탐색도 ${Math.round(explored / 12 * 100)}%`, W / 2, 47);
+  ctx.fillText(`정원 탐색도 ${Math.round(explored / 9 * 100)}%`, W / 2, 47);
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(5,9,18,.7)";
@@ -1459,10 +1405,12 @@ function render() {
 
 function win() {
   running = false;
-  const completeGarden = save.memories.length === memoryBlooms.length && save.shopItems.length === 4;
-  const endingTitle = completeGarden ? "모든 뿌리가 깨어났습니다" : "정원이 깨어났습니다";
+  const completeGarden = save.echoes.length === echoes.length
+    && save.shopItems.length === 4
+    && save.midBossDefeated;
+  const endingTitle = completeGarden ? "정원이 온전히 깨어났습니다" : "정원이 깨어났습니다";
   const endingText = completeGarden
-    ? "되찾은 기억이 정원 전체에 번져<br>잊힌 종이 완전한 음색으로 울립니다."
+    ? "되찾은 메아리가 정원 전체에 번져<br>잊힌 종이 완전한 음색으로 울립니다."
     : "당신이 모은 작은 소리들이<br>오래된 종을 다시 울렸습니다.";
   const overlay = document.createElement("div");
   overlay.className = "overlay";
