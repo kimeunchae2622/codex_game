@@ -11,6 +11,8 @@ const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
 const WORLD_W = 6200;
+const WORLD_TOP = -820;
+const WORLD_BOTTOM = 1100;
 const FLOOR = 475;
 
 const keys = new Set();
@@ -47,8 +49,8 @@ function storeSave() { localStorage.setItem("forgottenGarden", JSON.stringify(sa
 const player = {
   x: save.checkpoint, y: 380, w: 28, h: 43, vx: 0, vy: 0, dir: 1,
   grounded: false, coyote: 0, jumpBuffer: 0, airJumps: 0,
-  hp: 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0),
-  maxHp: 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0),
+  hp: 4 + Math.ceil(save.memories.length / 2) + (save.shopItems.includes("armor") ? 1 : 0),
+  maxHp: 4 + Math.ceil(save.memories.length / 2) + (save.shopItems.includes("armor") ? 1 : 0),
   inv: 0, attack: 0, attackId: 0, attackDir: "side", dash: 0, dashCool: 0,
   look: 0, respawning: 0
 };
@@ -95,7 +97,32 @@ const platforms = [
   { x: 4950, y: 365, w: 150, h: 18 },
   { x: 5280, y: 410, w: 150, h: 18 },
   { x: 5480, y: 355, w: 160, h: 18 },
-  { x: 5820, y: 405, w: 170, h: 18 }
+  { x: 5820, y: 405, w: 170, h: 18 },
+
+  // upper garden: canopy ascent
+  { x: 3500, y: 285, w: 110, h: 16 },
+  { x: 3310, y: 210, w: 120, h: 16 },
+  { x: 3490, y: 135, w: 112, h: 16 },
+  { x: 3300, y: 60, w: 120, h: 16 },
+  { x: 3480, y: -15, w: 115, h: 16 },
+  { x: 3290, y: -90, w: 124, h: 16 },
+  { x: 3470, y: -165, w: 120, h: 16 },
+  { x: 3280, y: -240, w: 125, h: 16 },
+  { x: 3460, y: -315, w: 120, h: 16 },
+  { x: 3270, y: -390, w: 128, h: 16 },
+  { x: 3450, y: -465, w: 125, h: 16 },
+  { x: 3240, y: -545, w: 190, h: 18 },
+
+  // lower garden: sunken roots
+  { x: 2500, y: 680, w: 350, h: 20 },
+  { x: 3020, y: 680, w: 380, h: 20 },
+  { x: 2640, y: 775, w: 220, h: 18 },
+  { x: 3180, y: 775, w: 230, h: 18 },
+  { x: 2450, y: 865, w: 300, h: 18 },
+  { x: 2870, y: 850, w: 250, h: 18 },
+  { x: 3320, y: 865, w: 310, h: 18 },
+  { x: 2300, y: 960, w: 600, h: 160 },
+  { x: 3000, y: 960, w: 650, h: 160 }
 ];
 
 const movingPlatforms = [
@@ -103,7 +130,8 @@ const movingPlatforms = [
   { x: 2247, y: 375, w: 96, h: 16, baseX: 2247, baseY: 375, axis: "x", range: 55, speed: 1.05, phase: 1.8, dx: 0, dy: 0, moving: true },
   { x: 2910, y: 382, w: 90, h: 16, baseX: 2910, baseY: 382, axis: "y", range: 45, speed: 1.4, phase: 3.1, dx: 0, dy: 0, moving: true },
   { x: 3992, y: 365, w: 100, h: 16, baseX: 3992, baseY: 365, axis: "x", range: 70, speed: 1.15, phase: 4.4, dx: 0, dy: 0, moving: true },
-  { x: 5095, y: 395, w: 105, h: 16, baseX: 5095, baseY: 395, axis: "y", range: 38, speed: 1.3, phase: 2.2, dx: 0, dy: 0, moving: true }
+  { x: 5095, y: 395, w: 105, h: 16, baseX: 5095, baseY: 395, axis: "y", range: 38, speed: 1.3, phase: 2.2, dx: 0, dy: 0, moving: true },
+  { x: 2913, y: 565, w: 84, h: 16, baseX: 2913, baseY: 565, axis: "y", range: 100, speed: .72, phase: 1.4, dx: 0, dy: 0, moving: true }
 ];
 
 const crumblePlatforms = [
@@ -117,8 +145,9 @@ const crumblePlatforms = [
 
 const spikes = [
   { x: 620, y: 455, w: 80, h: 20 }, { x: 1460, y: 455, w: 65, h: 20 },
-  { x: 2245, y: 455, w: 95, h: 20 }, { x: 2910, y: 455, w: 90, h: 20 },
-  { x: 3990, y: 455, w: 100, h: 20 }, { x: 5100, y: 455, w: 100, h: 20 }
+  { x: 2245, y: 455, w: 95, h: 20 },
+  { x: 3990, y: 455, w: 100, h: 20 }, { x: 5100, y: 455, w: 100, h: 20 },
+  { x: 2900, y: 940, w: 100, h: 20 }
 ];
 
 const checkpointData = [
@@ -142,7 +171,11 @@ const enemySeeds = [
   [1640, 311, "crawler"], [2020, 420, "flyer"], [2480, 331, "crawler"],
   [2690, 210, "flyer"], [3140, 342, "crawler"], [3540, 410, "flyer"],
   [3700, 342, "crawler"], [4200, 322, "crawler"], [4740, 330, "crawler"],
-  [4970, 270, "flyer"], [5380, 330, "crawler"], [5580, 250, "flyer"]
+  [4970, 270, "flyer"], [5380, 330, "crawler"], [5580, 250, "flyer"],
+  [3345, 178, "crawler", true], [3515, -115, "flyer", true],
+  [3315, -272, "crawler", true], [3490, -390, "flyer", true],
+  [2600, 648, "crawler", true], [3080, 648, "crawler", true],
+  [2820, 745, "flyer", true], [3390, 833, "crawler", true]
 ];
 let enemies = [];
 let midBoss = null;
@@ -154,14 +187,15 @@ function supportTopAt(x) {
 }
 
 function getMaxHp() {
-  return 5 + save.memories.length + (save.shopItems.includes("armor") ? 2 : 0);
+  return 4 + Math.ceil(save.memories.length / 2) + (save.shopItems.includes("armor") ? 1 : 0);
 }
 
 function resetEntities() {
   enemies = enemySeeds.map((e, i) => ({
-    id: i, x: e[0], y: e[2] === "crawler" ? supportTopAt(e[0]) - 32 : e[1], baseY: e[1], w: e[2] === "flyer" ? 34 : 38,
+    id: i, x: e[0], y: e[2] === "crawler" ? (e[3] ? e[1] : supportTopAt(e[0]) - 32) : e[1], baseY: e[1], w: e[2] === "flyer" ? 34 : 38,
     h: e[2] === "flyer" ? 28 : 32, type: e[2], hp: e[2] === "flyer" ? 2 : 3,
-    dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7, lastAttack: -1
+    dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7,
+    patrolRange: e[3] ? 34 : 90, lastAttack: -1
   }));
   midBoss = {
     x: 4380, y: FLOOR - 78, w: 62, h: 78, hp: 12, maxHp: 12, dir: -1,
@@ -554,7 +588,7 @@ function updatePlayer(dt) {
   }
 
   for (const s of spikes) if (overlap(player, s)) hurt(1, s.x + s.w / 2);
-  if (player.y > H + 120) respawn();
+  if (player.y > WORLD_BOTTOM + 80 || player.y < WORLD_TOP - 120) respawn();
 
   checkpointData.forEach(cp => {
     if (Math.abs(player.x - cp.x) < 38 && Math.abs(player.y + player.h - cp.y) < 65 && save.checkpoint !== cp.x) {
@@ -611,7 +645,7 @@ function updateEnemies(dt) {
     if (e.type === "crawler") {
       e.x += e.dir * 55 * dt;
       const home = enemySeeds[e.id][0];
-      if (Math.abs(e.x - home) > 90) e.dir *= -1;
+      if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
     } else {
       e.phase += dt * 2;
       e.y = e.baseY + Math.sin(e.phase) * 28;
@@ -883,7 +917,7 @@ function update(dt) {
   particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 170 * dt; p.vx *= Math.pow(.08, dt); });
   for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
   const targetX = clamp(player.x - W * .44, 0, WORLD_W - W);
-  const targetY = player.look * 52;
+  const targetY = clamp(player.y - H * .66 + player.look * 52, WORLD_TOP, WORLD_BOTTOM - H);
   camera.x = lerp(camera.x, targetX, 1 - Math.pow(.00005, dt));
   camera.y = lerp(camera.y, targetY, 1 - Math.pow(.005, dt));
   shake *= Math.pow(.01, dt);
@@ -936,6 +970,31 @@ function drawWorld() {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 115 + (x % 90)); ctx.stroke();
     ctx.fillStyle = "#182941"; ctx.beginPath(); ctx.ellipse(x, 130 + (x % 90), 25, 33, 0, 0, Math.PI * 2); ctx.fill();
   }
+
+  // vertical garden landmarks
+  ctx.save();
+  ctx.strokeStyle = "rgba(104,151,126,.28)";
+  ctx.lineWidth = 7;
+  for (let x = 3160; x <= 3650; x += 95) {
+    ctx.beginPath();
+    ctx.moveTo(x, 430);
+    ctx.bezierCurveTo(x - 45, 180, x + 50, -170, x - 20, -650);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(91,74,109,.3)";
+  ctx.lineWidth = 10;
+  for (let x = 2380; x <= 3600; x += 150) {
+    ctx.beginPath();
+    ctx.moveTo(x, 570);
+    ctx.bezierCurveTo(x + 70, 700, x - 60, 820, x + 25, 1040);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(194,232,211,.7)";
+  ctx.font = "12px system-ui";
+  ctx.fillText("↑  빛의 수관", 3415, 330);
+  ctx.fillStyle = "rgba(202,174,224,.72)";
+  ctx.fillText("↓  가라앉은 뿌리", 2815, 446);
+  ctx.restore();
 
   platforms.forEach(p => {
     ctx.fillStyle = p.h > 50 ? "#172333" : "#213046";
@@ -1327,7 +1386,12 @@ function drawHUD() {
   ctx.font = "11px system-ui";
   ctx.fillText(`뿌리 기억  ${save.memories.length} / 3`, W - 145, 74);
 
-  const room = player.x < 1500 ? "이끼 낀 회랑" : player.x < 3000 ? "빗물의 뿌리" : player.x < 4050 ? "별 없는 온실" : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
+  const room = player.y < 100 ? "빛의 수관"
+    : player.y > 600 ? "가라앉은 뿌리"
+      : player.x < 1500 ? "이끼 낀 회랑"
+        : player.x < 3000 ? "빗물의 뿌리"
+          : player.x < 4050 ? "별 없는 온실"
+            : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(213,232,248,.65)"; ctx.font = "12px Georgia, serif"; ctx.fillText(room, W / 2, 31);
   const explored = save.echoes.length + save.memories.length + save.shopItems.length
     + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
