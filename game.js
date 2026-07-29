@@ -29,7 +29,8 @@ let soundOn = false;
 let audio;
 let platformHintShown = false;
 let animationFrameId = 0;
-let pausedSupport = null;
+let loopGeneration = 0;
+let pauseSnapshot = null;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -439,25 +440,39 @@ function findSupportingPlatform(tolerance = 7) {
 
 function startGameLoop() {
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  const generation = ++loopGeneration;
   last = performance.now();
-  animationFrameId = requestAnimationFrame(loop);
+  animationFrameId = requestAnimationFrame(now => loop(now, generation));
 }
 
 function togglePause() {
   paused = !paused;
   pauseScreen.classList.toggle("hidden", !paused);
   if (paused) {
-    pausedSupport = findSupportingPlatform();
+    pauseSnapshot = {
+      x: player.x,
+      y: player.y,
+      vx: player.vx,
+      vy: player.vy,
+      support: player.grounded ? findSupportingPlatform() : null
+    };
+    loopGeneration++;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
   } else {
-    if (pausedSupport) {
-      player.y = pausedSupport.y - player.h;
-      player.vy = 0;
-      player.grounded = true;
-      player.coyote = .1;
+    if (pauseSnapshot) {
+      player.x = pauseSnapshot.x;
+      player.y = pauseSnapshot.y;
+      player.vx = pauseSnapshot.vx;
+      player.vy = pauseSnapshot.vy;
+      if (pauseSnapshot.support) {
+        player.y = pauseSnapshot.support.y - player.h;
+        player.vy = 0;
+        player.grounded = true;
+        player.coyote = .1;
+      }
     }
-    pausedSupport = null;
+    pauseSnapshot = null;
     keys.clear();
     taps.clear();
     startGameLoop();
@@ -497,10 +512,21 @@ function moveAndCollide(dt) {
   }
 
   player.grounded = false;
+  const previousY = player.y;
   player.y += player.vy * dt;
-  for (const p of solids) {
-    if (!overlap(player, p)) continue;
-    if (player.vy > 0) {
+  const verticalSolids = [...solids].sort((a, b) => player.vy >= 0
+    ? a.y - b.y
+    : (b.y + b.h) - (a.y + a.h));
+  for (const p of verticalSolids) {
+    const horizontallyOverlapping = player.x < p.x + p.w && player.x + player.w > p.x;
+    const crossedTop = player.vy > 0
+      && previousY + player.h <= p.y
+      && player.y + player.h >= p.y;
+    const crossedBottom = player.vy < 0
+      && previousY >= p.y + p.h
+      && player.y <= p.y + p.h;
+    if (!horizontallyOverlapping || (!overlap(player, p) && !crossedTop && !crossedBottom)) continue;
+    if (player.vy > 0 && (crossedTop || overlap(player, p))) {
       player.y = p.y - player.h;
       player.vy = 0;
       player.grounded = true;
@@ -508,7 +534,7 @@ function moveAndCollide(dt) {
       player.airJumps = save.shopItems.includes("doubleJump") ? 1 : 0;
       if (p.moving) player.x += p.dx;
       if (p.crumble && p.timer === 0) p.timer = .001;
-    } else if (player.vy < 0) {
+    } else if (player.vy < 0 && (crossedBottom || overlap(player, p))) {
       player.y = p.y + p.h;
       player.vy = 40;
     }
@@ -2018,15 +2044,15 @@ function win() {
   beep(920, 1.2, "sine", .07);
 }
 
-function loop(now) {
+function loop(now, generation) {
   animationFrameId = 0;
-  if (!running || paused) return;
+  if (!running || paused || generation !== loopGeneration) return;
   const dt = Math.min((now - last) / 1000, .033);
   last = now;
   if (!shopOpen) update(dt);
   else taps.clear();
   render();
-  animationFrameId = requestAnimationFrame(loop);
+  animationFrameId = requestAnimationFrame(nextNow => loop(nextNow, generation));
 }
 
 render();
