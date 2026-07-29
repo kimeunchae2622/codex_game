@@ -4,3 +4,4 @@ await mkdir("dist/server", { recursive: true });
 await mkdir("dist/.openai", { recursive: true });
 await copyFile("sites-server.js", "dist/server/index.js");
 await copyFile(".openai/hosting.json", "dist/.openai/hosting.json");
+await copyFile("game.js", "dist/game.js");
