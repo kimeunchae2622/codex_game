@@ -708,12 +708,18 @@ function updatePlayer(dt) {
   if (player.y > WORLD_BOTTOM + 80 || player.y < WORLD_TOP - 120) respawn();
 
   checkpointData.forEach(cp => {
-    if (Math.abs(player.x - cp.x) < 38 && Math.abs(player.y + player.h - cp.y) < 65 && save.checkpoint !== cp.x) {
+    const nearCheckpoint = Math.abs(player.x - cp.x) < 46
+      && Math.abs(player.y + player.h - cp.y) < 65;
+    const newlyReached = nearCheckpoint && save.checkpoint !== cp.x;
+    const manualRest = nearCheckpoint && tap("ArrowDown");
+    if (newlyReached || manualRest) {
       save.checkpoint = cp.x;
       save.checkpointY = cp.y - player.h;
       player.hp = player.maxHp;
       storeSave();
-      toast("등불이 기억을 품었습니다 · 체력 회복");
+      toast(manualRest
+        ? "체크포인트에서 휴식했습니다 · 체력 완전 회복"
+        : "등불이 기억을 품었습니다 · 체력 회복");
       puff(cp.x, cp.y, "#8ee8ff", 25, 130); beep(620, .5, "sine", .04);
     }
   });
@@ -1443,6 +1449,17 @@ function drawWorld() {
     ctx.fillStyle = active ? "#d6f8ff" : "#7890a4";
     ctx.shadowColor = active ? "#7bdfff" : "transparent"; ctx.shadowBlur = active ? 25 : 0;
     ctx.beginPath(); ctx.arc(cp.x, cp.y - 55, 8 + Math.sin(time * 3) * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    const nearCheckpoint = Math.abs(player.x - cp.x) < 64
+      && Math.abs(player.y + player.h - cp.y) < 72;
+    if (nearCheckpoint) {
+      ctx.fillStyle = "rgba(5,9,18,.86)";
+      ctx.fillRect(cp.x - 86, cp.y - 104, 172, 30);
+      ctx.fillStyle = "#d9f7ff";
+      ctx.font = "bold 15px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("↓ 휴식 · 체력 회복", cp.x, cp.y - 83);
+      ctx.textAlign = "left";
+    }
   });
 
   // dash shrine
