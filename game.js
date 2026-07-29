@@ -11,8 +11,8 @@ const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
 const WORLD_W = 6200;
-const WORLD_TOP = -820;
-const WORLD_BOTTOM = 1100;
+const WORLD_TOP = -1120;
+const WORLD_BOTTOM = 1450;
 const FLOOR = 475;
 
 const keys = new Set();
@@ -36,7 +36,8 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 
 const saveDefault = {
   checkpoint: 90, dash: false, echoes: [], defeated: [],
-  coins: 0, lostCoins: null, shopItems: [], opened: false, midBossDefeated: false
+  checkpointY: 380, coins: 0, lostCoins: null, shopItems: [], opened: false,
+  midBossDefeated: false, areaBosses: [], relics: []
 };
 let save = loadSave();
 
@@ -51,7 +52,7 @@ function loadSave() {
 function storeSave() { localStorage.setItem("forgottenGarden", JSON.stringify(save)); }
 
 const player = {
-  x: save.checkpoint, y: 380, w: 28, h: 43, vx: 0, vy: 0, dir: 1,
+  x: save.checkpoint, y: save.checkpointY, w: 28, h: 43, vx: 0, vy: 0, dir: 1,
   grounded: false, coyote: 0, jumpBuffer: 0, airJumps: 0,
   hp: 4 + (save.shopItems.includes("armor") ? 1 : 0),
   maxHp: 4 + (save.shopItems.includes("armor") ? 1 : 0),
@@ -129,7 +130,26 @@ const platforms = [
   { x: 2780, y: 820, w: 105, h: 18 },
   { x: 3015, y: 820, w: 105, h: 18 },
   { x: 2300, y: 960, w: 600, h: 160 },
-  { x: 3000, y: 960, w: 650, h: 160 }
+  { x: 3000, y: 960, w: 650, h: 160 },
+
+  // beyond the canopy: moonlit clocktower
+  { x: 3430, y: -620, w: 125, h: 16 },
+  { x: 3585, y: -695, w: 125, h: 16 },
+  { x: 3740, y: -770, w: 160, h: 16 },
+  { x: 3900, y: -835, w: 1260, h: 170 },
+  { x: 4050, y: -930, w: 150, h: 18 },
+  { x: 4320, y: -995, w: 135, h: 18 },
+  { x: 4590, y: -940, w: 145, h: 18 },
+  { x: 4870, y: -1010, w: 150, h: 18 },
+
+  // beyond the roots: flooded archive
+  { x: 3650, y: 1035, w: 135, h: 18 },
+  { x: 3815, y: 1110, w: 135, h: 18 },
+  { x: 3980, y: 1190, w: 1210, h: 190 },
+  { x: 4140, y: 1090, w: 155, h: 18 },
+  { x: 4410, y: 1030, w: 145, h: 18 },
+  { x: 4680, y: 1085, w: 150, h: 18 },
+  { x: 4950, y: 1015, w: 155, h: 18 }
 ];
 
 const movingPlatforms = [
@@ -154,11 +174,14 @@ const spikes = [
   { x: 620, y: 455, w: 80, h: 20 }, { x: 1460, y: 455, w: 65, h: 20 },
   { x: 2245, y: 455, w: 95, h: 20 },
   { x: 3990, y: 455, w: 100, h: 20 }, { x: 5100, y: 455, w: 100, h: 20 },
-  { x: 2900, y: 940, w: 100, h: 20 }
+  { x: 2900, y: 940, w: 100, h: 20 },
+  { x: 4310, y: -855, w: 85, h: 20 },
+  { x: 4320, y: 1170, w: 80, h: 20 }
 ];
 
 const checkpointData = [
-  { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 }
+  { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 },
+  { x: 4010, y: -835 }, { x: 4080, y: 1190 }
 ];
 
 const echoes = [
@@ -176,15 +199,20 @@ const enemySeeds = [
   [3345, 178, "crawler", true], [3515, -115, "flyer", true],
   [3315, -272, "crawler", true], [3490, -390, "flyer", true],
   [2600, 648, "crawler", true], [3080, 648, "crawler", true],
-  [2820, 745, "flyer", true], [3390, 793, "crawler", true]
+  [2820, 745, "flyer", true], [3390, 793, "crawler", true],
+  [4250, -915, "clockwork", true], [4500, -895, "clockwork", true],
+  [4240, 1110, "inkling", true], [4570, 1070, "inkling", true]
 ];
 let enemies = [];
 let midBoss = null;
 let boss = null;
+let areaBosses = [];
 
-function supportTopAt(x) {
+function supportTopAt(x, preferredY = FLOOR) {
   const supports = platforms.filter(p => x >= p.x && x <= p.x + p.w).map(p => p.y);
-  return supports.length ? Math.min(...supports) : FLOOR;
+  return supports.length
+    ? supports.reduce((best, y) => Math.abs(y - preferredY) < Math.abs(best - preferredY) ? y : best)
+    : FLOOR;
 }
 
 function getMaxHp() {
@@ -192,12 +220,19 @@ function getMaxHp() {
 }
 
 function resetEntities() {
-  enemies = enemySeeds.map((e, i) => ({
-    id: i, x: e[0], y: e[2] === "crawler" ? (e[3] ? e[1] : supportTopAt(e[0]) - 32) : e[1], baseY: e[1], w: e[2] === "flyer" ? 34 : 38,
-    h: e[2] === "flyer" ? 28 : 32, type: e[2], hp: e[2] === "flyer" ? 2 : 3,
-    dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7,
-    patrolRange: e[3] ? 34 : 90, lastAttack: -1
-  }));
+  enemies = enemySeeds.map((e, i) => {
+    const flying = e[2] === "flyer" || e[2] === "clockwork" || e[2] === "inkling";
+    const width = e[2] === "clockwork" ? 42 : e[2] === "inkling" ? 40 : flying ? 34 : 38;
+    const height = e[2] === "clockwork" ? 36 : e[2] === "inkling" ? 38 : flying ? 28 : 32;
+    const hp = e[2] === "clockwork" ? 4 : e[2] === "inkling" ? 5 : flying ? 2 : 3;
+    const y = flying ? e[1] : (e[3] ? e[1] : supportTopAt(e[0], e[1] + height) - height);
+    return {
+      id: i, x: e[0], y, baseY: e[1], w: width, h: height, type: e[2], hp,
+      dir: i % 2 ? -1 : 1, hit: 0, dead: save.defeated.includes(i), phase: i * 1.7,
+      patrolRange: e[3] ? 54 : 90, lastAttack: -1, cooldown: .7 + i % 4 * .28,
+      vx: 0, vy: 0, action: "idle", timer: 0
+    };
+  });
   midBoss = {
     x: 4380, y: FLOOR - 78, w: 62, h: 78, hp: 12, maxHp: 12, dir: -1,
     active: false, dead: save.midBossDefeated, hit: 0, cooldown: .8,
@@ -208,6 +243,20 @@ function resetEntities() {
     active: false, dead: false, hit: 0, cooldown: 1, action: "idle",
     timer: 0, cycle: 0, vx: 0, vy: 0, lastAttack: -1
   };
+  areaBosses = [
+    {
+      id: "moonKeeper", kind: "moon", name: "월륜의 파수꾼",
+      x: 4770, y: -915, baseY: -915, w: 70, h: 80, hp: 16, maxHp: 16,
+      active: false, dead: save.areaBosses.includes("moonKeeper"), hit: 0,
+      cooldown: .8, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
+    },
+    {
+      id: "archiveKeeper", kind: "archive", name: "먹빛 사서",
+      x: 4780, y: 1100, baseY: 1100, w: 76, h: 90, hp: 18, maxHp: 18,
+      active: false, dead: save.areaBosses.includes("archiveKeeper"), hit: 0,
+      cooldown: .9, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
+    }
+  ];
   coinDrops.length = 0;
   bossProjectiles.length = 0;
   crumblePlatforms.forEach(p => {
@@ -438,14 +487,14 @@ function hurt(amount, sourceX) {
   if (player.hp <= 0) respawn();
 }
 
-function safeCoinDropPosition(x) {
+function safeCoinDropPosition(x, y) {
   const groundPlatforms = platforms.filter(p => p.h > 50);
   let best = groundPlatforms[0];
   let bestDistance = Infinity;
   let safeX = x;
   groundPlatforms.forEach(platform => {
     const candidateX = clamp(x, platform.x + 24, platform.x + platform.w - 24);
-    const distance = Math.abs(candidateX - x);
+    const distance = Math.hypot(candidateX - x, platform.y - y);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = platform;
@@ -458,7 +507,7 @@ function safeCoinDropPosition(x) {
 function dropCoinsOnDeath() {
   const amount = save.coins;
   if (amount > 0) {
-    const position = safeCoinDropPosition(player.x + player.w / 2);
+    const position = safeCoinDropPosition(player.x + player.w / 2, player.y + player.h);
     save.lostCoins = { amount, x: position.x, y: position.y };
     puff(position.x, position.y, "#ffd36b", 22, 190);
   } else {
@@ -475,7 +524,7 @@ function respawn() {
   player.respawning = .8;
   setTimeout(() => {
     player.x = save.checkpoint;
-    player.y = 350;
+    player.y = save.checkpointY;
     player.vx = player.vy = 0;
     player.hp = player.maxHp;
     player.inv = 1.5;
@@ -567,7 +616,9 @@ function updatePlayer(dt) {
   if (tap("KeyC") && player.dashCool <= 0) {
     if (!save.dash) toast("대시의 기억이 아직 잠들어 있습니다");
     else {
-      player.dash = .16; player.dashCool = .55; player.inv = Math.max(player.inv, .18);
+      player.dash = .16;
+      player.dashCool = save.relics.includes("moonGear") ? .36 : .55;
+      player.inv = Math.max(player.inv, .18);
       puff(player.x + 14, player.y + 22, "#a59bff", 12, 180);
       beep(170, .13, "square", .04);
     }
@@ -607,7 +658,10 @@ function updatePlayer(dt) {
 
   checkpointData.forEach(cp => {
     if (Math.abs(player.x - cp.x) < 38 && Math.abs(player.y + player.h - cp.y) < 65 && save.checkpoint !== cp.x) {
-      save.checkpoint = cp.x; player.hp = player.maxHp; storeSave();
+      save.checkpoint = cp.x;
+      save.checkpointY = cp.y - player.h;
+      player.hp = player.maxHp;
+      storeSave();
       toast("등불이 기억을 품었습니다 · 체력 회복");
       puff(cp.x, cp.y, "#8ee8ff", 25, 130); beep(620, .5, "sine", .04);
     }
@@ -640,14 +694,52 @@ function updateEnemies(dt) {
   enemies.forEach(e => {
     if (e.dead) return;
     e.hit -= dt;
+    e.cooldown -= dt;
     if (e.type === "crawler") {
       e.x += e.dir * 55 * dt;
       const home = enemySeeds[e.id][0];
       if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
-    } else {
+    } else if (e.type === "flyer") {
       e.phase += dt * 2;
       e.y = e.baseY + Math.sin(e.phase) * 28;
       if (Math.abs(player.x - e.x) < 260) e.x += Math.sign(player.x - e.x) * 34 * dt;
+    } else if (e.type === "clockwork") {
+      e.phase += dt * 3.2;
+      e.y = e.baseY + Math.sin(e.phase) * 18;
+      e.x += e.dir * 42 * dt;
+      const home = enemySeeds[e.id][0];
+      if (Math.abs(e.x - home) > e.patrolRange) e.dir *= -1;
+      if (e.cooldown <= 0 && Math.hypot(player.x - e.x, player.y - e.y) < 390) {
+        fireAimedVolley(e, 2, .24, 210, "#f4d47b");
+        e.cooldown = 1.65;
+        beep(390, .09, "square", .025);
+      }
+    } else if (e.type === "inkling") {
+      e.phase += dt * 2.5;
+      if (e.action === "lunge") {
+        e.timer -= dt;
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        e.vx *= Math.pow(.22, dt);
+        e.vy *= Math.pow(.22, dt);
+        if (e.timer <= 0) {
+          e.action = "idle";
+          e.baseY = e.y;
+        }
+      } else {
+        e.y = e.baseY + Math.sin(e.phase) * 20;
+        if (e.cooldown <= 0 && Math.hypot(player.x - e.x, player.y - e.y) < 320) {
+          const angle = Math.atan2(player.y - e.y, player.x - e.x);
+          e.vx = Math.cos(angle) * 270;
+          e.vy = Math.sin(angle) * 270;
+          e.action = "lunge";
+          e.timer = .62;
+          e.cooldown = 1.8;
+          puff(e.x, e.y, "#63d5ca", 10, 100);
+        }
+      }
+      e.x = clamp(e.x, 4020, 4690);
+      e.y = clamp(e.y, 1020, 1145);
     }
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
       const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
@@ -658,8 +750,9 @@ function updateEnemies(dt) {
         e.dead = true;
         if (!save.defeated.includes(e.id)) save.defeated.push(e.id);
         storeSave();
-        spawnCoins(e.x + e.w / 2, e.y + e.h / 2, e.type === "flyer" ? 4 : 3);
-        puff(e.x, e.y, "#7186a8", 18, 180);
+        const regionalEnemy = e.type === "clockwork" || e.type === "inkling";
+        spawnCoins(e.x + e.w / 2, e.y + e.h / 2, regionalEnemy ? 6 : e.type === "flyer" ? 4 : 3);
+        puff(e.x, e.y, e.type === "clockwork" ? "#e8c66c" : e.type === "inkling" ? "#67d9c8" : "#7186a8", 18, 180);
       }
     }
     if (overlap(player, e)) hurt(1, e.x + e.w / 2);
@@ -685,8 +778,9 @@ function updateCoins(dt) {
     const dx = player.x + player.w / 2 - coin.x;
     const dy = player.y + player.h / 2 - coin.y;
     const distance = Math.hypot(dx, dy);
-    if (distance < 155) {
-      const pull = (1 - distance / 155) * 850;
+    const magnetRange = save.relics.includes("tideSigil") ? 260 : 155;
+    if (distance < magnetRange) {
+      const pull = (1 - distance / magnetRange) * 850;
       coin.vx += dx / Math.max(distance, 1) * pull * dt;
       coin.vy += dy / Math.max(distance, 1) * pull * dt;
     }
@@ -781,7 +875,8 @@ function updateBossProjectiles(dt) {
       bossProjectiles.splice(i, 1);
       continue;
     }
-    if (projectile.life <= 0 || projectile.x < 3900 || projectile.x > WORLD_W + 80 || projectile.y < -80 || projectile.y > H + 100) {
+    if (projectile.life <= 0 || projectile.x < -100 || projectile.x > WORLD_W + 100
+      || projectile.y < WORLD_TOP - 100 || projectile.y > WORLD_BOTTOM + 100) {
       bossProjectiles.splice(i, 1);
     }
   }
@@ -855,6 +950,128 @@ function updateMidBoss(dt) {
     }
   }
   if (overlap(player, midBoss)) hurt(1, midBoss.x + midBoss.w / 2);
+}
+
+function spawnGroundWavesAt(x, y, color) {
+  fireBossProjectile(x, y - 11, 0, 285, color, 10);
+  fireBossProjectile(x, y - 11, Math.PI, 285, color, 10);
+  shake = 11;
+  puff(x, y - 8, color, 20, 190);
+}
+
+function defeatAreaBoss(areaBoss) {
+  areaBoss.dead = true;
+  areaBoss.active = false;
+  if (!save.areaBosses.includes(areaBoss.id)) save.areaBosses.push(areaBoss.id);
+  const relic = areaBoss.kind === "moon" ? "moonGear" : "tideSigil";
+  if (!save.relics.includes(relic)) save.relics.push(relic);
+  storeSave();
+  spawnCoins(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, 16);
+  bossProjectiles.length = 0;
+  shake = 24;
+  const color = areaBoss.kind === "moon" ? "#f5d77a" : "#68dfd0";
+  puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, color, 65, 310);
+  toast(areaBoss.kind === "moon"
+    ? "월륜의 파수꾼 격파 · 월륜 톱니 획득 · 대시 재사용 시간 감소"
+    : "먹빛 사서 격파 · 회수의 인장 획득 · 코인 흡수 범위 증가", 4400);
+  beep(areaBoss.kind === "moon" ? 760 : 560, .8, "sine", .065);
+}
+
+function updateAreaBosses(dt) {
+  const hitbox = player.attack > .07 ? attackRect() : null;
+  areaBosses.forEach(areaBoss => {
+    if (areaBoss.dead) return;
+    const insideRegion = areaBoss.kind === "moon"
+      ? player.y < -700 && player.x > 4400
+      : player.y > 1000 && player.x > 4400;
+    if (insideRegion) areaBoss.active = true;
+    if (!areaBoss.active) return;
+
+    areaBoss.hit -= dt;
+    areaBoss.cooldown -= dt;
+    areaBoss.timer -= dt;
+    areaBoss.dir = player.x < areaBoss.x ? -1 : 1;
+
+    if (areaBoss.kind === "moon") {
+      if (areaBoss.action === "dash") {
+        areaBoss.x += areaBoss.vx * dt;
+        if (areaBoss.timer <= 0) {
+          areaBoss.action = "idle";
+          areaBoss.cooldown = .55;
+        }
+      } else {
+        areaBoss.y = areaBoss.baseY + Math.sin(time * 2.2) * 26;
+        areaBoss.x = clamp(areaBoss.x, 4460, 5050);
+        if (areaBoss.cooldown <= 0) {
+          areaBoss.cycle++;
+          if (areaBoss.cycle % 2) {
+            areaBoss.action = "dash";
+            areaBoss.timer = .58;
+            areaBoss.vx = areaBoss.dir * 430;
+            beep(180, .15, "sawtooth", .04);
+          } else {
+            fireAimedVolley(areaBoss, 5, 1.05, 255, "#f1cf68");
+            areaBoss.cooldown = .82;
+            puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + 22, "#f5d77a", 18, 150);
+          }
+        }
+      }
+    } else {
+      areaBoss.vy += 1280 * dt;
+      areaBoss.x += areaBoss.vx * dt;
+      areaBoss.y += areaBoss.vy * dt;
+      const landed = areaBoss.y + areaBoss.h >= 1190 && areaBoss.vy > 80;
+      if (areaBoss.y + areaBoss.h >= 1190) {
+        areaBoss.y = 1190 - areaBoss.h;
+        areaBoss.vy = 0;
+      }
+      areaBoss.x = clamp(areaBoss.x, 4420, 5080);
+
+      if (areaBoss.action === "charge") {
+        areaBoss.vx = areaBoss.dir * 310;
+        if (areaBoss.timer <= 0) {
+          areaBoss.action = "idle";
+          areaBoss.cooldown = .65;
+        }
+      } else if (areaBoss.action === "leap") {
+        areaBoss.vx = areaBoss.dir * 105;
+        if (landed && areaBoss.timer < 1.15) {
+          spawnGroundWavesAt(areaBoss.x + areaBoss.w / 2, 1190, "#69d8ca");
+          areaBoss.action = "idle";
+          areaBoss.cooldown = .8;
+        }
+      } else {
+        areaBoss.vx *= Math.pow(.03, dt);
+        if (areaBoss.cooldown <= 0) {
+          areaBoss.cycle++;
+          if (areaBoss.cycle % 3 === 1) {
+            areaBoss.action = "charge";
+            areaBoss.timer = .62;
+          } else if (areaBoss.cycle % 3 === 2) {
+            areaBoss.action = "leap";
+            areaBoss.timer = 1.55;
+            areaBoss.vy = -520;
+          } else {
+            fireAimedVolley(areaBoss, 4, .75, 230, "#5ad3c5");
+            areaBoss.cooldown = .9;
+          }
+        }
+      }
+    }
+
+    if (hitbox && overlap(hitbox, areaBoss) && areaBoss.lastAttack !== player.attackId) {
+      const attackPower = save.shopItems.includes("weapon") ? 2 : 1;
+      areaBoss.lastAttack = player.attackId;
+      areaBoss.hp -= attackPower;
+      areaBoss.hit = .17;
+      areaBoss.x += player.dir * 34;
+      shake = 6;
+      puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2,
+        areaBoss.kind === "moon" ? "#f4d477" : "#67dbcf", 12, 170);
+      if (areaBoss.hp <= 0) defeatAreaBoss(areaBoss);
+    }
+    if (overlap(player, areaBoss)) hurt(1, areaBoss.x + areaBoss.w / 2);
+  });
 }
 
 function updateBoss(dt) {
@@ -931,6 +1148,7 @@ function update(dt) {
   updateEnemies(dt);
   updateCoins(dt);
   updateMidBoss(dt);
+  updateAreaBosses(dt);
   updateBoss(dt);
   updateBossProjectiles(dt);
   particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 170 * dt; p.vx *= Math.pow(.08, dt); });
@@ -948,13 +1166,24 @@ function roundRect(x, y, w, h, r) {
 }
 
 function drawBackground() {
+  const clocktower = player.y < -600;
+  const archive = player.y > 1000;
+  const palette = clocktower
+    ? ["#11152c", "#0c1023", "#070918"]
+    : archive
+      ? ["#071d25", "#07171e", "#040d13"]
+      : ["#11182c", "#0b1321", "#070b12"];
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "#11182c"); grad.addColorStop(.65, "#0b1321"); grad.addColorStop(1, "#070b12");
+  grad.addColorStop(0, palette[0]); grad.addColorStop(.65, palette[1]); grad.addColorStop(1, palette[2]);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
 
   for (let layer = 0; layer < 3; layer++) {
     const depth = .08 + layer * .09;
-    ctx.fillStyle = [`#141d31`, `#101a2c`, `#0c1524`][layer];
+    ctx.fillStyle = clocktower
+      ? [`#1b203c`, `#141a34`, `#0d1228`][layer]
+      : archive
+        ? [`#0d3036`, `#0a272e`, `#071c24`][layer]
+        : [`#141d31`, `#101a2c`, `#0c1524`][layer];
     ctx.beginPath(); ctx.moveTo(0, H);
     for (let x = -80; x <= W + 80; x += 80) {
       const wx = x + camera.x * depth;
@@ -968,7 +1197,11 @@ function drawBackground() {
   motes.forEach(m => {
     const sx = m.x - camera.x * m.depth;
     if (sx < -5 || sx > W + 5) return;
-    ctx.fillStyle = m.depth > .5 ? "#a7e9ff" : "#6e87b3";
+    ctx.fillStyle = clocktower
+      ? (m.depth > .5 ? "#ffe59a" : "#998cc7")
+      : archive
+        ? (m.depth > .5 ? "#79ead9" : "#498f9b")
+        : (m.depth > .5 ? "#a7e9ff" : "#6e87b3");
     ctx.beginPath(); ctx.arc(sx, m.y + Math.sin(time + m.phase) * 8 - camera.y * m.depth, m.r, 0, Math.PI * 2); ctx.fill();
   });
   ctx.globalAlpha = 1;
@@ -1013,15 +1246,97 @@ function drawWorld() {
   ctx.fillText("↑  빛의 수관", 3415, 330);
   ctx.fillStyle = "rgba(202,174,224,.72)";
   ctx.fillText("↓  가라앉은 뿌리", 2815, 446);
+  ctx.fillStyle = "rgba(246,218,132,.75)";
+  ctx.fillText("↑  수관 끝 · 달빛 시계탑", 3260, -575);
+  ctx.fillStyle = "rgba(105,220,207,.75)";
+  ctx.fillText("→  뿌리 끝 · 침수된 기록고", 3460, 930);
+  ctx.restore();
+
+  // moonlit clocktower
+  ctx.save();
+  ctx.strokeStyle = "rgba(232,205,114,.22)";
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(4550, -1035, 150, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 12; i++) {
+    const angle = i * Math.PI / 6;
+    ctx.beginPath();
+    ctx.moveTo(4550 + Math.cos(angle) * 126, -1035 + Math.sin(angle) * 126);
+    ctx.lineTo(4550 + Math.cos(angle) * 145, -1035 + Math.sin(angle) * 145);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(4550, -1035);
+  ctx.lineTo(4550 + Math.cos(time * .18) * 92, -1035 + Math.sin(time * .18) * 92);
+  ctx.moveTo(4550, -1035);
+  ctx.lineTo(4550 + Math.cos(-time * .35) * 64, -1035 + Math.sin(-time * .35) * 64);
+  ctx.stroke();
+  for (let x = 3980; x <= 5100; x += 220) {
+    ctx.beginPath();
+    ctx.moveTo(x, -1120);
+    ctx.lineTo(x, -835);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(255,229,150,.78)";
+  ctx.font = "bold 15px system-ui";
+  ctx.fillText("달빛 시계탑", 3995, -875);
+  ctx.fillStyle = "rgba(255,236,178,.62)";
+  ctx.font = "11px system-ui";
+  ctx.fillText("수관 너머, 멈춘 달의 시간이 흐르는 곳", 3995, -856);
+  ctx.restore();
+
+  // flooded archive
+  ctx.save();
+  ctx.fillStyle = "rgba(47,161,157,.1)";
+  ctx.fillRect(3920, 1140, 1330, 310);
+  ctx.strokeStyle = "rgba(91,219,207,.22)";
+  ctx.lineWidth = 2;
+  for (let y = 1218; y < 1430; y += 42) {
+    ctx.beginPath();
+    for (let x = 3920; x <= 5250; x += 35) {
+      ctx.lineTo(x, y + Math.sin(x * .025 + time * 1.4) * 5);
+    }
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(79,150,154,.25)";
+  ctx.lineWidth = 9;
+  for (let x = 4100; x <= 5050; x += 240) {
+    ctx.strokeRect(x, 930, 110, 250);
+    for (let y = 970; y < 1160; y += 42) {
+      ctx.beginPath();
+      ctx.moveTo(x + 8, y);
+      ctx.lineTo(x + 102, y);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = "rgba(122,235,220,.82)";
+  ctx.font = "bold 15px system-ui";
+  ctx.fillText("침수된 기록고", 4020, 1160);
+  ctx.fillStyle = "rgba(160,224,220,.62)";
+  ctx.font = "11px system-ui";
+  ctx.fillText("뿌리 아래, 잊힌 문장이 물속을 떠도는 곳", 4020, 1178);
   ctx.restore();
 
   platforms.forEach(p => {
-    ctx.fillStyle = p.h > 50 ? "#172333" : "#213046";
+    const clockPlatform = p.y < -600;
+    const archivePlatform = p.y > 1000;
+    ctx.fillStyle = clockPlatform
+      ? (p.h > 50 ? "#1c2138" : "#34364c")
+      : archivePlatform
+        ? (p.h > 50 ? "#102b31" : "#21454a")
+        : (p.h > 50 ? "#172333" : "#213046");
     ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = "#344a5e"; ctx.fillRect(p.x, p.y, p.w, 4);
-    ctx.strokeStyle = "#213448"; ctx.lineWidth = 2;
+    ctx.fillStyle = clockPlatform ? "#c6a95d" : archivePlatform ? "#4ca89f" : "#344a5e";
+    ctx.fillRect(p.x, p.y, p.w, 4);
+    ctx.strokeStyle = clockPlatform ? "#58506d" : archivePlatform ? "#183c43" : "#213448";
+    ctx.lineWidth = 2;
     for (let x = p.x + 18; x < p.x + p.w; x += 42) {
-      ctx.beginPath(); ctx.moveTo(x, p.y + 7); ctx.lineTo(x - 8, Math.min(H, p.y + 38)); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, p.y + 7);
+      ctx.lineTo(x - 8, p.y + Math.min(38, p.h));
+      ctx.stroke();
     }
   });
 
@@ -1155,6 +1470,7 @@ function drawWorld() {
 
   enemies.forEach(drawEnemy);
   if (midBoss && !midBoss.dead) drawMidBoss();
+  areaBosses.forEach(drawAreaBoss);
   if (save.lostCoins) {
     const lost = save.lostCoins;
     ctx.save();
@@ -1221,15 +1537,106 @@ function drawEnemy(e) {
   if (e.dead) return;
   ctx.save(); ctx.translate(e.x + e.w / 2, e.y + e.h / 2);
   if (e.hit > 0) ctx.globalAlpha = .55;
-  ctx.fillStyle = e.type === "flyer" ? "#6f6b91" : "#45586a";
+  ctx.fillStyle = e.type === "clockwork" ? "#6d5c3c"
+    : e.type === "inkling" ? "#174b50"
+      : e.type === "flyer" ? "#6f6b91" : "#45586a";
   ctx.beginPath(); ctx.ellipse(0, 2, e.w / 2, e.h / 2, 0, 0, Math.PI * 2); ctx.fill();
   if (e.type === "flyer") {
     ctx.fillStyle = "#363b59";
     ctx.beginPath(); ctx.ellipse(-18, -2, 15, 7, -.4, 0, Math.PI * 2); ctx.ellipse(18, -2, 15, 7, .4, 0, Math.PI * 2); ctx.fill();
+  } else if (e.type === "clockwork") {
+    ctx.strokeStyle = "#e7c969";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4 + time;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 17, Math.sin(angle) * 15);
+      ctx.lineTo(Math.cos(angle) * 24, Math.sin(angle) * 21);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 2, 11, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (e.type === "inkling") {
+    ctx.fillStyle = "rgba(91,218,205,.5)";
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.ellipse(i * 11, 17 + Math.sin(time * 5 + i) * 4, 6, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "#67d8cd";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, -1, 14, Math.PI, Math.PI * 2);
+    ctx.stroke();
   }
-  ctx.fillStyle = "#aeeaff"; ctx.shadowColor = "#86dfff"; ctx.shadowBlur = 8;
+  ctx.fillStyle = e.type === "clockwork" ? "#fff0a9" : e.type === "inkling" ? "#9ffff1" : "#aeeaff";
+  ctx.shadowColor = e.type === "clockwork" ? "#e4bc45" : e.type === "inkling" ? "#57d9ce" : "#86dfff";
+  ctx.shadowBlur = 8;
   ctx.beginPath(); ctx.arc(e.dir * 7, -3, 3, 0, Math.PI * 2); ctx.fill();
   ctx.restore(); ctx.shadowBlur = 0;
+}
+
+function drawAreaBoss(areaBoss) {
+  if (areaBoss.dead) return;
+  ctx.save();
+  ctx.translate(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2);
+  ctx.scale(areaBoss.dir, 1);
+  if (areaBoss.hit > 0) ctx.globalAlpha = .52;
+
+  if (areaBoss.kind === "moon") {
+    ctx.rotate(Math.sin(time * 1.8) * .08);
+    ctx.shadowColor = "#f1cf68";
+    ctx.shadowBlur = areaBoss.action === "dash" ? 28 : 17;
+    ctx.strokeStyle = "#e3c465";
+    ctx.lineWidth = 6;
+    for (let i = 0; i < 10; i++) {
+      const angle = i * Math.PI / 5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 31, Math.sin(angle) * 31);
+      ctx.lineTo(Math.cos(angle) * 42, Math.sin(angle) * 42);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#363249";
+    ctx.beginPath();
+    ctx.arc(0, 0, 31, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#f6dfa0";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#fff0a7";
+    ctx.beginPath();
+    ctx.arc(8, -4, 5, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.shadowColor = "#54d5c8";
+    ctx.shadowBlur = areaBoss.action === "leap" ? 25 : 14;
+    ctx.fillStyle = "#173f45";
+    ctx.beginPath();
+    ctx.ellipse(0, 12, 34, 43, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#bfded8";
+    ctx.beginPath();
+    ctx.ellipse(0, -25, 26, 29, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#5bd5c9";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let i = -2; i <= 2; i++) {
+      ctx.moveTo(i * 11, 37);
+      ctx.quadraticCurveTo(i * 14 + Math.sin(time * 4 + i) * 8, 58, i * 10, 67);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "#143138";
+    ctx.beginPath();
+    ctx.arc(-8, -25, 4, 0, Math.PI * 2);
+    ctx.arc(8, -25, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.shadowBlur = 0;
 }
 
 function drawMidBoss() {
@@ -1356,18 +1763,20 @@ function drawHUD() {
     ctx.strokeRect(W - 67 + i * 14, 29, 7, 7);
   }
 
-  const room = player.y < 100 ? "빛의 수관"
-    : player.y > 600 ? "가라앉은 뿌리"
+  const room = player.y < -600 ? "달빛 시계탑"
+    : player.y < 100 ? "빛의 수관"
+      : player.y > 1000 ? "침수된 기록고"
+        : player.y > 600 ? "가라앉은 뿌리"
       : player.x < 1500 ? "이끼 낀 회랑"
         : player.x < 3000 ? "빗물의 뿌리"
           : player.x < 4050 ? "별 없는 온실"
             : player.x < 5200 ? "침묵의 전당" : "가장 깊은 종루";
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(213,232,248,.65)"; ctx.font = "12px Georgia, serif"; ctx.fillText(room, W / 2, 31);
   const explored = save.echoes.length + save.shopItems.length
-    + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
+    + save.areaBosses.length + (save.dash ? 1 : 0) + (save.midBossDefeated ? 1 : 0);
   ctx.font = "10px system-ui";
   ctx.fillStyle = "rgba(159,183,204,.55)";
-  ctx.fillText(`정원 탐색도 ${Math.round(explored / 9 * 100)}%`, W / 2, 47);
+  ctx.fillText(`세계 탐색도 ${Math.round(explored / 11 * 100)}%`, W / 2, 47);
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(5,9,18,.7)";
@@ -1381,14 +1790,35 @@ function drawHUD() {
     ctx.fillRect(28, 52, 28, 3);
   }
 
-  const activeBoss = boss?.active && !boss.dead ? boss : midBoss?.active && !midBoss.dead ? midBoss : null;
+  const activeAreaBoss = areaBosses.find(areaBoss => areaBoss.active && !areaBoss.dead);
+  const activeBoss = boss?.active && !boss.dead
+    ? boss
+    : midBoss?.active && !midBoss.dead
+      ? midBoss
+      : activeAreaBoss || null;
   if (activeBoss) {
     const bw = 360, x = (W - bw) / 2, y = H - 32;
     ctx.fillStyle = "#141827"; ctx.fillRect(x, y, bw, 7);
-    ctx.fillStyle = activeBoss === boss ? "#c58dea" : "#70d5cd";
+    ctx.fillStyle = activeBoss === boss
+      ? "#c58dea"
+      : activeBoss.kind === "moon"
+        ? "#e6c75f"
+        : "#70d5cd";
     ctx.fillRect(x, y, bw * activeBoss.hp / activeBoss.maxHp, 7);
     ctx.fillStyle = "#d9d4ea"; ctx.font = "11px system-ui";
-    ctx.fillText(activeBoss === boss ? "심연의 종지기" : "청록 수문장", W / 2, y - 7);
+    ctx.fillText(activeBoss === boss ? "심연의 종지기"
+      : activeBoss === midBoss ? "청록 수문장" : activeBoss.name, W / 2, y - 7);
+  }
+
+  if (save.relics.length) {
+    ctx.textAlign = "right";
+    ctx.font = "11px system-ui";
+    ctx.fillStyle = "rgba(225,236,242,.72)";
+    const relicNames = [
+      save.relics.includes("moonGear") ? "⚙ 월륜 톱니" : "",
+      save.relics.includes("tideSigil") ? "◉ 회수의 인장" : ""
+    ].filter(Boolean).join("  ");
+    ctx.fillText(relicNames, W - 25, 102);
   }
   ctx.restore();
 }
@@ -1407,7 +1837,8 @@ function win() {
   running = false;
   const completeGarden = save.echoes.length === echoes.length
     && save.shopItems.length === 4
-    && save.midBossDefeated;
+    && save.midBossDefeated
+    && save.areaBosses.length === areaBosses.length;
   const endingTitle = completeGarden ? "정원이 온전히 깨어났습니다" : "정원이 깨어났습니다";
   const endingText = completeGarden
     ? "되찾은 메아리가 정원 전체에 번져<br>잊힌 종이 완전한 음색으로 울립니다."
