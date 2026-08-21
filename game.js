@@ -33,6 +33,18 @@ const WORLD_TOP = 0;
 const WORLD_BOTTOM = 5900;
 const FLOOR = 475;
 
+function loadVisualAsset(src) {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = src;
+  return image;
+}
+
+const visualAssets = {
+  caveTiles: loadVisualAsset("assets/cc0/yewt-cave-moody.png"),
+  shrooman: loadVisualAsset("assets/cc0/pixelhero-shrooman.png")
+};
+
 // 포자 정원을 지표층으로 고정하고 모든 지역을 그 아래의 깊이대로 재배치한다.
 const DEPTH_OFFSETS = {
   garden: 0, canopy: 1890, clock: 2860, bell: 2825,
@@ -2648,6 +2660,154 @@ const fungalPalettes = {
   coast: { sky: ["#112d3f", "#091d2b", "#050d16"], far: "#1a4961", mid: "#12394f", rock: "#142e3c", ridge: "#70c5df", glow: "#c5f6ff", cap: "#82cde2" }
 };
 
+function drawCaveTexture(x, y, w, h, alpha = .2, scale = 1.5) {
+  const image = visualAssets.caveTiles;
+  if (!image.complete || !image.naturalWidth || w <= 0 || h <= 0) return;
+  const tile = 48 * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  for (let ty = y - ((camera.y * .025) % tile); ty < y + h + tile; ty += tile) {
+    for (let tx = x - ((camera.x * .035) % tile); tx < x + w + tile; tx += tile) {
+      const variant = Math.abs(Math.floor(tx / tile) + Math.floor(ty / tile)) % 2;
+      ctx.drawImage(image, variant * 48, 0, 48, 48, Math.round(tx), Math.round(ty), Math.ceil(tile), Math.ceil(tile));
+    }
+  }
+  ctx.restore();
+}
+
+function drawCaveBackWall(region) {
+  const p = fungalPalettes[region];
+  ctx.save();
+  const wall = ctx.createLinearGradient(0, 0, 0, H);
+  wall.addColorStop(0, `${p.far}f2`);
+  wall.addColorStop(.52, `${p.mid}e8`);
+  wall.addColorStop(1, "#05080bea");
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, W, H);
+  drawCaveTexture(0, 0, W, H, .16, 1.75);
+
+  const alcoveShift = -((camera.x * .055) % 330);
+  for (let i = -1; i < 4; i++) {
+    const x = alcoveShift + i * 330 + (i % 2) * 34;
+    const top = 92 + Math.abs(Math.sin((camera.x + i * 271) * .0014)) * 34;
+    const width = 248;
+    const recess = ctx.createRadialGradient(x + width / 2, top + 175, 18, x + width / 2, top + 175, 175);
+    recess.addColorStop(0, "rgba(3,7,10,.93)");
+    recess.addColorStop(.65, `${p.sky[2]}e8`);
+    recess.addColorStop(1, `${p.mid}55`);
+    ctx.fillStyle = recess;
+    ctx.beginPath();
+    ctx.moveTo(x, H + 20);
+    ctx.lineTo(x, top + 150);
+    ctx.bezierCurveTo(x + 5, top + 35, x + 55, top, x + width / 2, top);
+    ctx.bezierCurveTo(x + width - 55, top, x + width - 5, top + 35, x + width, top + 150);
+    ctx.lineTo(x + width, H + 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = `${p.ridge}38`;
+    ctx.lineWidth = 11;
+    ctx.stroke();
+    ctx.strokeStyle = `${p.glow}18`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 21, H);
+    ctx.lineTo(x + 21, top + 155);
+    ctx.bezierCurveTo(x + 28, top + 60, x + 73, top + 25, x + width / 2, top + 23);
+    ctx.stroke();
+  }
+
+  const mist = ctx.createLinearGradient(0, H * .45, 0, H);
+  mist.addColorStop(0, "rgba(185,235,220,0)");
+  mist.addColorStop(.72, `${p.glow}12`);
+  mist.addColorStop(1, "rgba(2,5,8,.58)");
+  ctx.fillStyle = mist;
+  ctx.fillRect(0, H * .4, W, H * .6);
+  ctx.restore();
+}
+
+function drawDistantShroomfolk(region) {
+  const image = visualAssets.shrooman;
+  if (!image.complete || !image.naturalWidth) return;
+  const p = fungalPalettes[region];
+  ctx.save();
+  ctx.globalAlpha = .34;
+  ctx.shadowColor = p.glow;
+  ctx.shadowBlur = 8;
+  for (let i = 0; i < 4; i++) {
+    const worldCell = Math.floor(camera.x * .075 / 240) + i;
+    const x = i * 260 - ((camera.x * .075) % 240) + 34;
+    const y = 310 + Math.abs(Math.sin(worldCell * 2.73)) * 86 - camera.y * .008;
+    const frame = Math.abs(worldCell + Math.floor(time * 2)) % 6;
+    const row = Math.abs(worldCell) % 3;
+    const size = 92 + (worldCell & 1) * 14;
+    ctx.drawImage(image, frame * 68, row * 68, 68, 68, x, y, size, size);
+    ctx.fillStyle = `${p.glow}20`;
+    ctx.beginPath();
+    ctx.ellipse(x + size / 2, y + size * .88, size * .18, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCaveForegroundFrame(region) {
+  const p = fungalPalettes[region];
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(W, 0);
+  ctx.lineTo(W, 52);
+  for (let x = W; x >= 0; x -= 48) {
+    const n = Math.abs(Math.sin((x + camera.x * .16) * .021));
+    ctx.lineTo(x, 58 + n * 39 + (x % 144 === 0 ? 20 : 0));
+  }
+  ctx.closePath();
+  const ceiling = ctx.createLinearGradient(0, 0, 0, 125);
+  ceiling.addColorStop(0, "#020405");
+  ceiling.addColorStop(1, p.rock);
+  ctx.fillStyle = ceiling;
+  ctx.fill();
+  ctx.save(); ctx.clip(); drawCaveTexture(0, 0, W, 135, .48, 1.25); ctx.restore();
+
+  for (let x = -20 - ((camera.x * .13) % 120); x < W + 60; x += 120) {
+    const length = 18 + Math.abs(Math.sin(x * .027 + camera.y * .004)) * 45;
+    ctx.fillStyle = "#080d0f";
+    ctx.beginPath();
+    ctx.moveTo(x, 62); ctx.lineTo(x + 25, 62); ctx.lineTo(x + 13, 62 + length); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = `${p.ridge}45`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x + 2, 64); ctx.lineTo(x + 13, 60 + length); ctx.stroke();
+  }
+
+  const side = 42 + Math.abs(Math.sin(camera.x * .0017)) * 21;
+  const leftWall = ctx.createLinearGradient(0, 0, side + 72, 0);
+  leftWall.addColorStop(0, "rgba(1,3,4,.98)");
+  leftWall.addColorStop(1, `${p.rock}10`);
+  ctx.fillStyle = leftWall;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(side, 0);
+  for (let y = 70; y <= H; y += 62) ctx.lineTo(side + 20 + Math.sin(y * .043 + camera.y * .01) * 24, y);
+  ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+
+  const rightWall = ctx.createLinearGradient(W, 0, W - side - 72, 0);
+  rightWall.addColorStop(0, "rgba(1,3,4,.98)");
+  rightWall.addColorStop(1, `${p.rock}10`);
+  ctx.fillStyle = rightWall;
+  ctx.beginPath();
+  ctx.moveTo(W, 0); ctx.lineTo(W - side, 0);
+  for (let y = 70; y <= H; y += 62) ctx.lineTo(W - side - 20 - Math.cos(y * .039 + camera.y * .01) * 24, y);
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+  const rim = ctx.createRadialGradient(W / 2, H * .48, H * .18, W / 2, H * .48, W * .62);
+  rim.addColorStop(0, "rgba(0,0,0,0)");
+  rim.addColorStop(.78, "rgba(0,0,0,.06)");
+  rim.addColorStop(1, "rgba(0,0,0,.58)");
+  ctx.fillStyle = rim;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
 function seededWave(value) {
   return (Math.sin(value * 12.9898) * 43758.5453) % 1;
 }
@@ -2707,7 +2867,9 @@ function drawBackground() {
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
 
   // 거대한 균사 기둥을 세 겹으로 배치해 방마다 깊이와 실루엣을 만든다.
+  drawCaveBackWall(region);
   drawFungalParallax(region);
+  drawDistantShroomfolk(region);
 
   for (let layer = 0; layer < 3; layer++) {
     const depth = .08 + layer * .09;
@@ -2843,6 +3005,7 @@ function drawBackground() {
     }
   }
   ctx.restore();
+  drawCaveForegroundFrame(region);
 }
 
 function drawExpandedRegionDetails() {
@@ -3005,6 +3168,18 @@ function drawOrganicPlatform(p, region) {
   ctx.lineTo(p.x + p.w, p.y + p.h);
   ctx.lineTo(p.x, p.y + p.h);
   ctx.closePath(); ctx.fill();
+
+  if (visualAssets.caveTiles.complete && visualAssets.caveTiles.naturalWidth && p.h >= 22) {
+    ctx.save();
+    ctx.globalAlpha = thick ? .2 : .12;
+    ctx.beginPath();
+    ctx.rect(p.x, p.y + topH, p.w, Math.min(p.h - topH, 72));
+    ctx.clip();
+    for (let x = p.x; x < p.x + p.w; x += 48) {
+      ctx.drawImage(visualAssets.caveTiles, 0, 0, 48, 48, Math.round(x), Math.round(p.y + topH), 48, 48);
+    }
+    ctx.restore();
+  }
 
   ctx.shadowColor = palette.glow;
   ctx.shadowBlur = thick ? 9 : 6;
