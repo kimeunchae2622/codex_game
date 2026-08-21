@@ -42,7 +42,12 @@ function loadVisualAsset(src) {
 
 const visualAssets = {
   caveTiles: loadVisualAsset("assets/cc0/yewt-cave-moody.png"),
-  shrooman: loadVisualAsset("assets/cc0/pixelhero-shrooman.png")
+  shrooman: loadVisualAsset("assets/cc0/pixelhero-shrooman.png"),
+  cavernBackground: loadVisualAsset("assets/cc0/ansimuz-cavern-background.png"),
+  cavernBackWalls: loadVisualAsset("assets/cc0/ansimuz-cavern-back-walls.png"),
+  cavernForeground: loadVisualAsset("assets/cc0/ansimuz-cavern-foreground.png"),
+  mushroomWalk: loadVisualAsset("assets/cc0/scratchio-mushroom-walk.png"),
+  mushroomHurt: loadVisualAsset("assets/cc0/scratchio-mushroom-hurt.png")
 };
 
 // 포자 정원을 지표층으로 고정하고 모든 지역을 그 아래의 깊이대로 재배치한다.
@@ -117,6 +122,20 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 const rnd = (a, b) => a + Math.random() * (b - a);
+
+function applyHitRecoil(entity, dt, damping = .006, property = "recoil") {
+  const velocity = entity[property] || 0;
+  if (Math.abs(velocity) < .5) {
+    entity[property] = 0;
+    return;
+  }
+  entity.x += velocity * dt;
+  entity[property] = velocity * Math.pow(damping, dt);
+}
+
+function knockDirectionFromPlayer(entity) {
+  return Math.sign(entity.x + entity.w / 2 - (player.x + player.w / 2)) || player.dir;
+}
 
 const saveDefault = {
   checkpoint: 90, dash: false, echoes: [], defeated: [],
@@ -1834,8 +1853,6 @@ function updateEnemies(dt) {
     e.hit -= dt;
     e.cooldown -= dt;
     e.timer -= dt;
-    e.x += e.knockback * dt;
-    e.knockback *= Math.pow(.008, dt);
     const playerCenterX = player.x + player.w / 2;
     const playerCenterY = player.y + player.h / 2;
     const enemyCenterX = e.x + e.w / 2;
@@ -1969,15 +1986,15 @@ function updateEnemies(dt) {
       e.x = clamp(e.x, 4020, 4690);
       e.y = clamp(e.y, 1020 + DEPTH_OFFSETS.archive, 1145 + DEPTH_OFFSETS.archive);
     }
+    // Apply recoil after AI movement so hovering enemies cannot overwrite it.
+    applyHitRecoil(e, dt, .008, "knockback");
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
       const attackPower = getAttackPower();
-      const knockDirection = Math.sign(
-        e.x + e.w / 2 - (player.x + player.w / 2)
-      ) || player.dir;
+      const knockDirection = knockDirectionFromPlayer(e);
       e.lastAttack = player.attackId;
       e.hp -= attackPower;
       e.hit = .18;
-      e.knockback = knockDirection * (["clockwork", "inkling", "emberling", "starling"].includes(e.type) ? 235 : 195);
+      e.knockback = knockDirection * (["clockwork", "inkling", "emberling", "starling"].includes(e.type) ? 165 : 145);
       bounceFromDownwardHit(e);
       shake = 4;
       puff(e.x + e.w / 2 - knockDirection * 8, e.y + e.h / 2, "#baf0ff", 11, 165);
@@ -2194,13 +2211,15 @@ function updateMidBoss(dt) {
     }
   }
 
+  applyHitRecoil(midBoss, dt);
+
   const hitbox = player.attack > .07 ? attackRect() : null;
   if (hitbox && overlap(hitbox, midBoss) && midBoss.lastAttack !== player.attackId) {
     const attackPower = getAttackPower();
     midBoss.lastAttack = player.attackId;
     midBoss.hp -= attackPower;
     midBoss.hit = .16;
-    midBoss.vx += player.dir * 75;
+    midBoss.recoil = knockDirectionFromPlayer(midBoss) * 108;
     bounceFromDownwardHit(midBoss);
     shake = 6;
     puff(midBoss.x + midBoss.w / 2, midBoss.y + 30, "#8ce4df", 11, 160);
@@ -2373,11 +2392,13 @@ function updateElites(dt) {
       }
     }
 
+    applyHitRecoil(elite, dt);
+
     if (hitbox && overlap(hitbox, elite) && elite.lastAttack !== player.attackId) {
       elite.lastAttack = player.attackId;
       elite.hp -= getAttackPower();
       elite.hit = .16;
-      elite.vx += player.dir * 68;
+      elite.recoil = knockDirectionFromPlayer(elite) * 118;
       bounceFromDownwardHit(elite);
       shake = 6;
       puff(elite.x + elite.w / 2, elite.y + elite.h / 2, elite.color, 11, 165);
@@ -2519,12 +2540,13 @@ function updateAreaBosses(dt) {
       }
     }
 
+    applyHitRecoil(areaBoss, dt);
     if (areaBoss.action !== "vanish" && hitbox && overlap(hitbox, areaBoss) && areaBoss.lastAttack !== player.attackId) {
       const attackPower = getAttackPower();
       areaBoss.lastAttack = player.attackId;
       areaBoss.hp -= attackPower;
       areaBoss.hit = .17;
-      areaBoss.x += player.dir * 34;
+      areaBoss.recoil = knockDirectionFromPlayer(areaBoss) * 88;
       bounceFromDownwardHit(areaBoss);
       shake = 6;
       puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2,
@@ -2595,10 +2617,12 @@ function updateBoss(dt) {
     }
   }
 
+  applyHitRecoil(boss, dt);
   const hitbox = player.attack > .07 ? attackRect() : null;
   if (hitbox && overlap(hitbox, boss) && boss.lastAttack !== player.attackId) {
     const attackPower = getAttackPower();
-    boss.lastAttack = player.attackId; boss.hp -= attackPower; boss.hit = .15; boss.vx += player.dir * 90;
+    boss.lastAttack = player.attackId; boss.hp -= attackPower; boss.hit = .15;
+    boss.recoil = knockDirectionFromPlayer(boss) * 76;
     bounceFromDownwardHit(boss);
     shake = 8; puff(boss.x + boss.w / 2, boss.y + 40, "#d9c7ff", 13, 180);
     if (boss.hp <= 0) {
@@ -2728,6 +2752,28 @@ function drawCaveBackWall(region) {
   ctx.restore();
 }
 
+function drawCavernAssetLayers(region) {
+  const background = visualAssets.cavernBackground;
+  const backWalls = visualAssets.cavernBackWalls;
+  if (!background.complete || !background.naturalWidth || !backWalls.complete || !backWalls.naturalWidth) return;
+  const hue = {
+    garden: 92, canopy: 112, roots: 0, clock: 28,
+    bell: -12, archive: 72, forge: -38, coast: 48
+  }[region] || 0;
+  ctx.save();
+  ctx.filter = `hue-rotate(${hue}deg) saturate(1.18) brightness(.88)`;
+  ctx.globalAlpha = .33;
+  const panelW = 360;
+  const shift = -((camera.x * .018) % panelW);
+  for (let x = shift - panelW; x < W + panelW; x += panelW) {
+    ctx.drawImage(background, 0, 0, 192, 288, Math.round(x), 0, panelW + 1, H);
+  }
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = .44;
+  ctx.drawImage(backWalls, 0, 0, 512, 288, 0, 0, W, H);
+  ctx.restore();
+}
+
 function drawDistantShroomfolk(region) {
   const image = visualAssets.shrooman;
   if (!image.complete || !image.naturalWidth) return;
@@ -2799,6 +2845,19 @@ function drawCaveForegroundFrame(region) {
   for (let y = 70; y <= H; y += 62) ctx.lineTo(W - side - 20 - Math.cos(y * .039 + camera.y * .01) * 24, y);
   ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
 
+  const foreground = visualAssets.cavernForeground;
+  if (foreground.complete && foreground.naturalWidth) {
+    const hue = {
+      garden: 92, canopy: 112, roots: 0, clock: 28,
+      bell: -12, archive: 72, forge: -38, coast: 48
+    }[region] || 0;
+    ctx.save();
+    ctx.filter = `hue-rotate(${hue}deg) saturate(1.24) brightness(.9)`;
+    ctx.globalAlpha = .34;
+    ctx.drawImage(foreground, 0, 0, 512, 288, 0, 0, W, H);
+    ctx.restore();
+  }
+
   const rim = ctx.createRadialGradient(W / 2, H * .48, H * .18, W / 2, H * .48, W * .62);
   rim.addColorStop(0, "rgba(0,0,0,0)");
   rim.addColorStop(.78, "rgba(0,0,0,.06)");
@@ -2868,6 +2927,7 @@ function drawBackground() {
 
   // 거대한 균사 기둥을 세 겹으로 배치해 방마다 깊이와 실루엣을 만든다.
   drawCaveBackWall(region);
+  drawCavernAssetLayers(region);
   drawFungalParallax(region);
   drawDistantShroomfolk(region);
 
@@ -3782,6 +3842,25 @@ function drawEnemy(e) {
     starling: ["#234a67", "#68bddd", "#d7f7ff"]
   }[e.type] || ["#324e43", "#88d79d", "#bcffd1"];
   ctx.shadowColor = style[1]; ctx.shadowBlur = e.action === "cast" ? 18 : 8;
+
+  if ((e.type === "crawler" || e.type === "emberling")
+    && visualAssets.mushroomWalk.complete && visualAssets.mushroomWalk.naturalWidth
+    && visualAssets.mushroomHurt.complete && visualAssets.mushroomHurt.naturalWidth) {
+    const hurtFrame = e.hit > 0;
+    const image = hurtFrame ? visualAssets.mushroomHurt : visualAssets.mushroomWalk;
+    const frame = hurtFrame ? 0 : Math.floor(time * (e.action === "bite" ? 13 : 8) + e.phase * 2) % 6;
+    const drawW = e.type === "emberling" ? 64 : 56;
+    const drawH = e.type === "emberling" ? 62 : 54;
+    ctx.save();
+    ctx.scale(e.dir, 1);
+    ctx.filter = e.type === "emberling"
+      ? "hue-rotate(-12deg) saturate(1.55) brightness(1.08)"
+      : "hue-rotate(92deg) saturate(1.28) brightness(1.05)";
+    ctx.drawImage(image, frame * 29, 0, 29, 28, -drawW / 2, -drawH / 2 - 3, drawW, drawH);
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
 
   // 모든 일반 적은 균핵 몸통 + 고유 포자낭 실루엣으로 구분한다.
   ctx.fillStyle = style[0];
