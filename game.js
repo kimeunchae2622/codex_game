@@ -608,12 +608,15 @@ const spikes = [
 ];
 
 const checkpointData = [
-  { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 },
-  { x: 4010, y: -845 }, { x: 4410, y: -1060 }, { x: 4080, y: 1190 },
-  { x: 6360, y: 475 }, { x: 7480, y: 475 }, { x: 7810, y: 1190 }, { x: 5580, y: 1190 }
-  ,{ x: 2050, y: -840 }, { x: 6100, y: -1060 }, { x: 5550, y: -275 }
-  ,{ x: 760, y: 960 }, { x: 4200, y: 2050 }, { x: 6400, y: 2050 }
-  ,{ x: 8900, y: 475 }, { x: 10400, y: 475 }, { x: 9200, y: 1190 }, { x: 11100, y: 1190 }
+  // Exactly three rest points per region, stored in final world coordinates.
+  { x: 115, y: 475, region: "garden" }, { x: 1810, y: 475, region: "garden" }, { x: 4380, y: 475, region: "garden" },
+  { x: 1900, y: 1050, region: "canopy" }, { x: 2650, y: 1050, region: "canopy" }, { x: 3450, y: 1050, region: "canopy" },
+  { x: 4450, y: 1800, region: "clock" }, { x: 5750, y: 1800, region: "clock" }, { x: 7000, y: 1800, region: "clock" },
+  { x: 5300, y: 3300, region: "bell" }, { x: 5700, y: 3300, region: "bell" }, { x: 6100, y: 3300, region: "bell" },
+  { x: 600, y: 3300, region: "roots" }, { x: 1450, y: 3300, region: "roots" }, { x: 2150, y: 3300, region: "roots" },
+  { x: 3100, y: 4050, region: "archive" }, { x: 4800, y: 4050, region: "archive" }, { x: 6500, y: 4050, region: "archive" },
+  { x: 6250, y: 4800, region: "forge" }, { x: 9000, y: 4800, region: "forge" }, { x: 10500, y: 4800, region: "forge" },
+  { x: 8750, y: 5550, region: "coast" }, { x: 10200, y: 5550, region: "coast" }, { x: 11800, y: 5550, region: "coast" }
 ];
 
 const echoes = [
@@ -686,6 +689,59 @@ function addMyceliumShaft(x, topY, bottomY, options = {}) {
   }
 }
 
+function addRegionalRouteNetworks() {
+  const routePlatforms = [
+    // Spore Garden: two arches above the direct ground road.
+    [4050, 400, 130, "garden"], [4230, 325, 125, "garden"], [4420, 250, 135, "garden"],
+    [4620, 325, 125, "garden"], [4800, 400, 135, "garden"],
+    // Luminous Canopy: a high greenhouse loop with a safe return path.
+    [1840, 975, 145, "canopy"], [2070, 900, 140, "canopy"], [2330, 825, 150, "canopy"],
+    [2610, 900, 145, "canopy"], [2890, 975, 150, "canopy"], [3200, 900, 145, "canopy"],
+    // Moonlit Clocktower: separated upper galleries that reward timing.
+    [4550, 1725, 145, "clock"], [4800, 1650, 150, "clock"], [5080, 1725, 145, "clock"],
+    [6100, 1725, 145, "clock"], [6380, 1650, 150, "clock"], [6680, 1725, 150, "clock"],
+    // Bell Tower: side balconies turn the central ascent into a looping nave.
+    [5050, 3225, 145, "bell"], [5260, 3150, 145, "bell"], [5510, 3075, 150, "bell"],
+    [5790, 3000, 145, "bell"], [6060, 3075, 145, "bell"], [6220, 3150, 135, "bell"],
+    // Sunken Roots: a hollow crown above the dangerous floor route.
+    [600, 3225, 145, "roots"], [850, 3150, 150, "roots"], [1130, 3075, 145, "roots"],
+    [1420, 3150, 150, "roots"], [1710, 3225, 145, "roots"], [1990, 3150, 145, "roots"],
+    // Flooded Archive: staggered shelves form upper and lower reading loops.
+    [3180, 3975, 150, "archive"], [3460, 3900, 145, "archive"], [3760, 3825, 150, "archive"],
+    [4080, 3900, 145, "archive"], [4380, 3975, 150, "archive"], [5350, 3975, 150, "archive"],
+    [5650, 3900, 145, "archive"], [5980, 3975, 150, "archive"],
+    // Ashen Forge: overhead maintenance catwalks avoid the furnace floor.
+    [8000, 4725, 150, "forge"], [8280, 4650, 145, "forge"], [8580, 4575, 150, "forge"],
+    [8900, 4650, 145, "forge"], [9220, 4725, 150, "forge"], [9800, 4650, 145, "forge"],
+    [10100, 4575, 150, "forge"], [10420, 4650, 145, "forge"],
+    // Star-sleep Coast: two wave-shaped routes rise and fall above the shore.
+    [8840, 5475, 150, "coast"], [9130, 5400, 145, "coast"], [9440, 5325, 150, "coast"],
+    [9760, 5400, 145, "coast"], [10070, 5475, 150, "coast"], [10800, 5475, 150, "coast"],
+    [11100, 5400, 145, "coast"], [11420, 5475, 150, "coast"]
+  ];
+  routePlatforms.forEach(([x, y, w, region], index) => {
+    platforms.push({ x, y, w, h: 17, oneWay: true, route: true, routeRegion: region, routeIndex: index });
+  });
+
+  [
+    { x: 3040, y: 825, axis: "x", range: 105, speed: .72, region: "canopy" },
+    { x: 5480, y: 1650, axis: "x", range: 150, speed: .58, region: "clock" },
+    { x: 4700, y: 3900, axis: "y", range: 68, speed: .82, region: "archive" },
+    { x: 9500, y: 4650, axis: "x", range: 115, speed: .9, region: "forge" },
+    { x: 10450, y: 5400, axis: "y", range: 62, speed: .68, region: "coast" }
+  ].forEach((platform, index) => movingPlatforms.push({
+    ...platform, w: 112, h: 16, baseX: platform.x, baseY: platform.y,
+    phase: index * 1.13, dx: 0, dy: 0, moving: true, oneWay: true, route: true
+  }));
+
+  [
+    [4345, 325, "garden"], [4945, 1650, "clock"], [1280, 3075, "roots"],
+    [3925, 3825, "archive"], [8740, 4575, "forge"], [9600, 5325, "coast"]
+  ].forEach(([x, y, region]) => crumblePlatforms.push({
+    x, y, w: 82, h: 15, timer: 0, gone: 0, crumble: true, route: true, routeRegion: region
+  }));
+}
+
 function relocateWorldBelowGarden() {
   vendors.forEach(vendor => {
     const forced = vendor.id === "garden" ? "garden" : vendor.id;
@@ -706,7 +762,7 @@ function relocateWorldBelowGarden() {
     spike.y = depthY(spike.x + spike.w / 2, spike.y);
   });
   checkpointData.forEach(checkpoint => {
-    checkpoint.y = depthY(checkpoint.x, checkpoint.y);
+    if (!checkpoint.region) checkpoint.y = depthY(checkpoint.x, checkpoint.y);
   });
   echoes.forEach(echo => { echo.y = depthY(echo.x, echo.y, "garden"); });
   const landmarkRegions = {
@@ -732,6 +788,7 @@ function relocateWorldBelowGarden() {
   addMyceliumShaft(6060, 3250, 4800);
   addMyceliumShaft(7480, 4800, 5550);
   addMyceliumShaft(5020, 4050, 5550, { width: 145 });
+  addRegionalRouteNetworks();
 }
 
 relocateWorldBelowGarden();
