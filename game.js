@@ -29,9 +29,32 @@ const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
 const WORLD_W = 12400;
-const WORLD_TOP = -1900;
-const WORLD_BOTTOM = 2350;
+const WORLD_TOP = 0;
+const WORLD_BOTTOM = 5900;
 const FLOOR = 475;
+
+// 포자 정원을 지표층으로 고정하고 모든 지역을 그 아래의 깊이대로 재배치한다.
+const DEPTH_OFFSETS = {
+  garden: 0, canopy: 1890, clock: 2860, bell: 2825,
+  roots: 2340, archive: 2000, forge: 4325, coast: 4360
+};
+
+function legacyRegionAt(x, y) {
+  if (y < -900) return "clock";
+  if (y >= 1450) return "archive";
+  if (x >= 5200 && y >= 800) return "coast";
+  if (x >= 6250 && y < 800) return "forge";
+  if (x >= 5200 && y < 800) return "bell";
+  if (y < 100) return "canopy";
+  if (y > 1000) return "archive";
+  if (y > 600) return "roots";
+  return "garden";
+}
+
+function depthY(x, y, forcedRegion = "") {
+  const region = forcedRegion || legacyRegionAt(x, y);
+  return y + DEPTH_OFFSETS[region];
+}
 
 const keys = new Set();
 const taps = new Set();
@@ -90,13 +113,15 @@ const saveDefault = {
   ownedSigils: [], equippedSigils: [], sigilSlots: 3,
   slotUpgrades: [], slotRewards: [],
   bellBossDefeated: false, resonance: false, forgeHeart: false, endingSeen: false,
-  eliteDefeated: [], discoveries: []
+  eliteDefeated: [], discoveries: [], layoutVersion: 2
 };
 let save = loadSave();
 
 function loadSave() {
   try {
-    const loaded = { ...saveDefault, ...JSON.parse(localStorage.getItem("forgottenGarden") || "{}") };
+    const raw = JSON.parse(localStorage.getItem("forgottenGarden") || "{}");
+    const loaded = { ...saveDefault, ...raw };
+    if (!("layoutVersion" in raw)) loaded.layoutVersion = 1;
     delete loaded.memories;
     return loaded;
   }
@@ -160,6 +185,13 @@ function normalizeSave() {
   ["echoes", "defeated", "shopItems", "areaBosses", "relics", "ownedSigils", "equippedSigils", "slotUpgrades", "slotRewards", "eliteDefeated", "discoveries"]
     .forEach(key => { if (!Array.isArray(save[key])) save[key] = []; });
   if (!Number.isFinite(save.sigilSlots)) save.sigilSlots = 3;
+  if ((save.layoutVersion || 1) < 2) {
+    save.checkpointY = depthY(save.checkpoint, save.checkpointY);
+    if (save.lostCoins && Number.isFinite(save.lostCoins.y)) {
+      save.lostCoins.y = depthY(save.lostCoins.x, save.lostCoins.y);
+    }
+    save.layoutVersion = 2;
+  }
   save.relics.forEach(id => {
     if (sigilCatalog[id] && !save.ownedSigils.includes(id)) save.ownedSigils.push(id);
   });
@@ -598,6 +630,64 @@ const enemySeeds = [
   [8900, 1050, "starling", true], [9500, 1040, "starling", true], [10400, 1040, "starling", true],
   [11100, 1035, "starling", true], [11700, 1040, "starling", true]
 ];
+
+function addMyceliumShaft(x, topY, bottomY, options = {}) {
+  let index = 0;
+  for (let y = topY + 75; y < bottomY; y += 75) {
+    const side = index++ % 2 ? 115 : 0;
+    platforms.push({ x: x + side, y, w: options.width || 135, h: 17, oneWay: true, shaft: true });
+  }
+}
+
+function relocateWorldBelowGarden() {
+  vendors.forEach(vendor => {
+    const forced = vendor.id === "garden" ? "garden" : vendor.id;
+    vendor.y = depthY(vendor.x, vendor.y, forced);
+  });
+  platforms.forEach(platform => {
+    platform.y = depthY(platform.x + platform.w / 2, platform.y);
+  });
+  movingPlatforms.forEach(platform => {
+    const region = legacyRegionAt(platform.x + platform.w / 2, platform.baseY);
+    platform.y += DEPTH_OFFSETS[region];
+    platform.baseY += DEPTH_OFFSETS[region];
+  });
+  crumblePlatforms.forEach(platform => {
+    platform.y = depthY(platform.x + platform.w / 2, platform.y);
+  });
+  spikes.forEach(spike => {
+    spike.y = depthY(spike.x + spike.w / 2, spike.y);
+  });
+  checkpointData.forEach(checkpoint => {
+    checkpoint.y = depthY(checkpoint.x, checkpoint.y);
+  });
+  echoes.forEach(echo => { echo.y = depthY(echo.x, echo.y, "garden"); });
+  const landmarkRegions = {
+    "포자 정원": "garden", "발광 균관": "canopy", "월광 포자탑": "clock", "균사 종루": "bell",
+    "잿빛 배양로": "forge", "별포자 습지": "coast", "침수 균문고": "archive", "가라앉은 균근": "roots"
+  };
+  landmarks.forEach(landmark => {
+    landmark.y = depthY(landmark.x, landmark.y, landmarkRegions[landmark.region] || "garden");
+  });
+  eliteDefs.forEach(elite => {
+    elite.groundY += DEPTH_OFFSETS[elite.region];
+  });
+  enemySeeds.forEach(seed => {
+    seed[1] = depthY(seed[0], seed[1]);
+  });
+
+  // 허브에서 각 심층 구역으로 이어지는 75px 간격의 양방향 균사 갱도.
+  addMyceliumShaft(3310, 500, 1010);
+  addMyceliumShaft(3930, 1280, 2040);
+  addMyceliumShaft(5080, 2040, 2670);
+  addMyceliumShaft(2700, 500, 3300);
+  addMyceliumShaft(3500, 3300, 4050);
+  addMyceliumShaft(6060, 3250, 4800);
+  addMyceliumShaft(7480, 4800, 5550);
+  addMyceliumShaft(5020, 4050, 5550, { width: 145 });
+}
+
+relocateWorldBelowGarden();
 let enemies = [];
 let midBoss = null;
 let boss = null;
@@ -635,32 +725,36 @@ function resetEntities() {
     action: "idle", timer: 0, cycle: 0, vx: 0, vy: 0, lastAttack: -1
   };
   boss = {
-    x: 5700, y: 367, w: 82, h: 108, hp: 30, maxHp: 30, dir: -1,
+    x: 5700, y: 367 + DEPTH_OFFSETS.bell, groundY: FLOOR + DEPTH_OFFSETS.bell,
+    w: 82, h: 108, hp: 30, maxHp: 30, dir: -1,
     active: false, dead: save.bellBossDefeated, hit: 0, cooldown: 1, action: "idle",
     timer: 0, cycle: 0, vx: 0, vy: 0, lastAttack: -1
   };
   areaBosses = [
     {
       id: "moonKeeper", kind: "moon", name: "월륜 포자지기",
-      x: 6900, y: -1170, baseY: -1170, w: 70, h: 80, hp: 18, maxHp: 18,
+      x: 6900, y: -1170 + DEPTH_OFFSETS.clock, baseY: -1170 + DEPTH_OFFSETS.clock, w: 70, h: 80, hp: 18, maxHp: 18,
       active: false, dead: save.areaBosses.includes("moonKeeper"), hit: 0,
       cooldown: .8, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
     {
       id: "archiveKeeper", kind: "archive", name: "먹빛 균문사서",
-      x: 6600, y: 1960, baseY: 1960, groundY: 2050, bounds: [6300, 6940], w: 76, h: 90, hp: 22, maxHp: 22,
+      x: 6600, y: 1960 + DEPTH_OFFSETS.archive, baseY: 1960 + DEPTH_OFFSETS.archive,
+      groundY: 2050 + DEPTH_OFFSETS.archive, bounds: [6300, 6940], w: 76, h: 90, hp: 22, maxHp: 22,
       active: false, dead: save.areaBosses.includes("archiveKeeper"), hit: 0,
       cooldown: .9, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
     {
       id: "forgeCore", kind: "forge", name: "잿불 배양심장",
-      x: 10500, y: 383, baseY: 383, groundY: FLOOR, bounds: [10180, 10920], w: 84, h: 92, hp: 28, maxHp: 28,
+      x: 10500, y: 383 + DEPTH_OFFSETS.forge, baseY: 383 + DEPTH_OFFSETS.forge,
+      groundY: FLOOR + DEPTH_OFFSETS.forge, bounds: [10180, 10920], w: 84, h: 92, hp: 28, maxHp: 28,
       active: false, dead: save.areaBosses.includes("forgeCore"), hit: 0,
       cooldown: .75, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
     {
       id: "starDevourer", kind: "coast", name: "별포자 포식체",
-      x: 11920, y: 1092, baseY: 1092, groundY: 1190, bounds: [11680, 12320], w: 86, h: 98, hp: 32, maxHp: 32,
+      x: 11920, y: 1092 + DEPTH_OFFSETS.coast, baseY: 1092 + DEPTH_OFFSETS.coast,
+      groundY: 1190 + DEPTH_OFFSETS.coast, bounds: [11680, 12320], w: 86, h: 98, hp: 32, maxHp: 32,
       active: false, dead: save.areaBosses.includes("starDevourer"), hit: 0,
       cooldown: .72, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     }
@@ -824,15 +918,13 @@ function synthMusicDrum(start, strong = false) {
 }
 
 function getRegionAt(x, y) {
-  if (y < -900) return "clock";
-  if (y >= 1450) return "archive";
-  if (x >= 5200 && y >= 800) return "coast";
-  if (x >= 6250 && y < 800) return "forge";
-  if (x >= 5200 && y < 800) return "bell";
-  if (y < 100) return "canopy";
-  if (y > 1000) return "archive";
-  if (y > 600) return "roots";
-  return "garden";
+  if (y < 700) return "garden";
+  if (y < 1550) return "canopy";
+  if (y < 2350) return "clock";
+  if (y < 3400) return x >= 5000 ? "bell" : x >= 3650 ? "archive" : "roots";
+  if (y < 4500) return x < 3000 ? "roots" : "archive";
+  if (y < 5200) return "forge";
+  return "coast";
 }
 
 function getRegionMusic() {
@@ -1740,7 +1832,17 @@ function updateEnemies(dt) {
 
     if (e.type === "crawler" || e.type === "emberling") {
       const home = enemySeeds[e.id][0];
-      if (e.action === "bite") {
+      if (e.type === "emberling" && e.action === "eruption") {
+        e.x -= e.dir * 18 * dt;
+        if (e.timer <= .22 && !e.attackFired) {
+          e.attackFired = true;
+          for (let i = -1; i <= 1; i++) {
+            fireBossProjectile(enemyCenterX, enemyCenterY - 12, -Math.PI / 2 + i * .34, 230, "#ff8950", 6, 390);
+          }
+          puff(enemyCenterX, enemyCenterY, "#ff9b55", 12, 105);
+        }
+        if (e.timer <= 0) e.action = "idle";
+      } else if (e.action === "bite") {
         if (e.timer > .22) {
           e.x -= e.dir * 28 * dt;
         } else {
@@ -1753,14 +1855,32 @@ function updateEnemies(dt) {
         if (e.cooldown <= 0 && Math.abs(playerCenterX - enemyCenterX) < 135
           && Math.abs(playerCenterY - enemyCenterY) < 70) {
           e.dir = playerCenterX < enemyCenterX ? -1 : 1;
-          e.action = "bite";
-          e.timer = .48;
+          e.action = e.type === "emberling" ? "eruption" : "bite";
+          e.timer = e.type === "emberling" ? .68 : .48;
+          e.attackFired = false;
           e.cooldown = 1.25;
           puff(enemyCenterX, enemyCenterY, e.type === "emberling" ? "#ff8b4a" : "#8faec1", 6, 65);
         }
       }
       e.x = clamp(e.x, home - e.patrolRange - 18, home + e.patrolRange + 18);
-    } else if (e.type === "flyer" || e.type === "starling") {
+    } else if (e.type === "starling") {
+      e.phase += dt * 1.45;
+      e.y = e.baseY + Math.sin(e.phase) * 24;
+      const home = enemySeeds[e.id][0];
+      e.x = home + Math.sin(e.phase * .55) * 52;
+      if (e.action === "cast") {
+        if (e.timer <= .24 && !e.attackFired) {
+          e.attackFired = true;
+          for (let i = 0; i < 6; i++) {
+            fireBossProjectile(enemyCenterX, enemyCenterY, i * Math.PI / 3 + e.phase * .15, 145, "#8bdcff", 6);
+          }
+        }
+        if (e.timer <= 0) { e.action = "idle"; e.cooldown = 1.8; }
+      } else if (e.cooldown <= 0 && distanceToPlayer < 330) {
+        e.action = "cast"; e.timer = .62; e.attackFired = false;
+        puff(enemyCenterX, enemyCenterY, "#b9efff", 10, 80);
+      }
+    } else if (e.type === "flyer") {
       e.phase += dt * 2;
       if (e.action === "dive") {
         e.x += e.vx * dt;
@@ -1835,7 +1955,7 @@ function updateEnemies(dt) {
         }
       }
       e.x = clamp(e.x, 4020, 4690);
-      e.y = clamp(e.y, 1020, 1145);
+      e.y = clamp(e.y, 1020 + DEPTH_OFFSETS.archive, 1145 + DEPTH_OFFSETS.archive);
     }
     if (hitbox && overlap(hitbox, e) && e.lastAttack !== player.attackId) {
       const attackPower = getAttackPower();
@@ -1972,11 +2092,11 @@ function fireAimedVolley(source, count, spread, speed, color) {
   }
 }
 
-function spawnShockwaves(x, enraged = false) {
+function spawnShockwaves(x, enraged = false, groundY = FLOOR) {
   const speeds = enraged ? [250, 390] : [260];
   speeds.forEach(speed => {
-    fireBossProjectile(x, FLOOR - 12, 0, speed, "#d4a8ff", 11);
-    fireBossProjectile(x, FLOOR - 12, Math.PI, speed, "#d4a8ff", 11);
+    fireBossProjectile(x, groundY - 12, 0, speed, "#d4a8ff", 11);
+    fireBossProjectile(x, groundY - 12, Math.PI, speed, "#d4a8ff", 11);
   });
   shake = enraged ? 18 : 12;
   puff(x, FLOOR - 10, "#c69cff", enraged ? 32 : 20, 230);
@@ -2013,7 +2133,7 @@ function updateBossProjectiles(dt) {
 }
 
 function updateMidBoss(dt) {
-  const playerOnMidBossFloor = player.y > 120 && player.y < 560;
+  const playerOnMidBossFloor = getRegionAt(player.x, player.y) === "garden" && player.y > 120 && player.y < 560;
   if (save.opened && player.x > 4140 && playerOnMidBossFloor && !midBoss.dead) midBoss.active = true;
   if (!playerOnMidBossFloor) midBoss.active = false;
   if (!midBoss.active || midBoss.dead) return;
@@ -2054,7 +2174,9 @@ function updateMidBoss(dt) {
         midBoss.action = "jump"; midBoss.timer = 1.5; midBoss.vy = -470;
       } else {
         midBoss.action = "cast"; midBoss.timer = .65;
-        fireAimedVolley(midBoss, 3, .5, 235, "#84d8dd");
+        for (let i = -2; i <= 2; i++) {
+          fireBossProjectile(midBoss.x + 31, midBoss.y + 20, -Math.PI / 2 + i * .23, 205 + Math.abs(i) * 18, "#84d8dd", 7, 300);
+        }
         beep(210, .22, "triangle", .045);
       }
     }
@@ -2203,19 +2325,37 @@ function updateElites(dt) {
       elite.vx *= Math.pow(.02, dt);
       if (elite.cooldown <= 0) {
         elite.cycle++;
-        if (elite.cycle % 3 === 1) {
+        const styleCycle = {
+          canopy: ["leap", "charge", "leap"], roots: ["charge", "leap", "charge"],
+          clock: ["cast", "charge", "cast"], bell: ["cast", "leap", "cast"],
+          archive: ["cast", "charge", "leap"], forge: ["charge", "leap", "charge"],
+          coast: ["leap", "cast", "cast"]
+        }[elite.region];
+        const nextAction = styleCycle[(elite.cycle - 1) % styleCycle.length];
+        if (nextAction === "charge") {
           elite.action = "charge";
           elite.timer = .55;
           beep(150, .12, "sawtooth", .035);
-        } else if (elite.cycle % 3 === 2) {
+        } else if (nextAction === "leap") {
           elite.action = "leap";
           elite.timer = 1.45;
-          elite.vy = -500;
+          elite.vy = elite.region === "canopy" || elite.region === "coast" ? -610 : -500;
         } else {
           elite.action = "cast";
           elite.timer = .72;
-          fireAimedVolley(elite, elite.hp <= elite.maxHp / 2 ? 5 : 3,
-            elite.hp <= elite.maxHp / 2 ? .95 : .55, 245, elite.color);
+          if (elite.region === "clock") {
+            elite.x = player.x < (elite.bounds[0] + elite.bounds[1]) / 2 ? elite.bounds[1] - 70 : elite.bounds[0] + 20;
+            fireAimedVolley(elite, 4, .7, 275, elite.color);
+          } else if (elite.region === "bell") {
+            for (let i = 0; i < 8; i++) fireBossProjectile(elite.x + 29, elite.y + 30, i * Math.PI / 4, 205, elite.color, 7);
+          } else if (elite.region === "archive") {
+            for (let i = 0; i < 5; i++) fireBossProjectile(elite.bounds[0] + 70 + i * 125, elite.groundY - 280, Math.PI / 2, 65, elite.color, 8, 210);
+          } else if (elite.region === "coast") {
+            fireAimedVolley(elite, 7, 1.3, 235, elite.color);
+          } else {
+            fireAimedVolley(elite, elite.hp <= elite.maxHp / 2 ? 5 : 3,
+              elite.hp <= elite.maxHp / 2 ? .95 : .55, 245, elite.color);
+          }
           puff(elite.x + elite.w / 2, elite.y + 22, elite.color, 12, 125);
         }
       }
@@ -2239,13 +2379,14 @@ function updateAreaBosses(dt) {
   const hitbox = player.attack > .07 ? attackRect() : null;
   areaBosses.forEach(areaBoss => {
     if (areaBoss.dead) return;
+    const currentRegion = getRegionAt(player.x + player.w / 2, player.y + player.h / 2);
     const insideRegion = areaBoss.kind === "moon"
-      ? player.y < -920 && player.x > 6500
+      ? currentRegion === "clock" && player.x > 6500
       : areaBoss.kind === "archive"
-        ? player.y > 1800 && player.x > 6200 && player.x < 7050
+        ? currentRegion === "archive" && player.x > 6200 && player.x < 7050
         : areaBoss.kind === "forge"
-          ? save.resonance && player.y < 600 && player.x > 10000
-          : save.forgeHeart && player.y > 980 && player.x > 11500;
+          ? save.resonance && currentRegion === "forge" && player.x > 10000
+          : save.forgeHeart && currentRegion === "coast" && player.x > 11500;
     if (insideRegion) areaBoss.active = true;
     else areaBoss.active = false;
     if (!areaBoss.active) return;
@@ -2279,60 +2420,94 @@ function updateAreaBosses(dt) {
           }
         }
       }
-    } else {
-      const groundY = areaBoss.groundY || (areaBoss.kind === "forge" ? FLOOR : 1190);
-      const bounds = areaBoss.bounds || (areaBoss.kind === "archive"
-        ? [4420, 5080]
-        : areaBoss.kind === "forge"
-          ? [7040, 7540]
-          : [7820, 8480]);
-      const attackColor = areaBoss.kind === "archive" ? "#69d8ca"
-        : areaBoss.kind === "forge" ? "#ff7548" : "#86d7ff";
-      areaBoss.vy += 1280 * dt;
-      areaBoss.x += areaBoss.vx * dt;
-      areaBoss.y += areaBoss.vy * dt;
-      const landed = areaBoss.y + areaBoss.h >= groundY && areaBoss.vy > 80;
-      if (areaBoss.y + areaBoss.h >= groundY) {
-        areaBoss.y = groundY - areaBoss.h;
-        areaBoss.vy = 0;
-      }
-      areaBoss.x = clamp(areaBoss.x, bounds[0], bounds[1]);
-
-      if (areaBoss.action === "charge") {
-        areaBoss.vx = areaBoss.dir * 310;
-        if (areaBoss.timer <= 0) {
-          areaBoss.action = "idle";
-          areaBoss.cooldown = .65;
+    } else if (areaBoss.kind === "archive") {
+      const groundY = areaBoss.groundY;
+      areaBoss.vy += 1180 * dt; areaBoss.x += areaBoss.vx * dt; areaBoss.y += areaBoss.vy * dt;
+      if (areaBoss.y + areaBoss.h >= groundY) { areaBoss.y = groundY - areaBoss.h; areaBoss.vy = 0; }
+      areaBoss.x = clamp(areaBoss.x, areaBoss.bounds[0], areaBoss.bounds[1]);
+      areaBoss.vx *= Math.pow(.025, dt);
+      if (areaBoss.action === "vanish") {
+        if (areaBoss.timer <= .36 && !areaBoss.attackFired) {
+          areaBoss.attackFired = true;
+          areaBoss.x = clamp(player.x + (areaBoss.cycle % 2 ? -170 : 150), areaBoss.bounds[0], areaBoss.bounds[1]);
+          puff(areaBoss.x + 38, groundY - 18, "#7ff4da", 26, 180);
+          for (let i = 0; i < 8; i++) fireBossProjectile(areaBoss.x + 38, groundY - 45, i * Math.PI / 4, 185, "#69d8ca", 7);
         }
-      } else if (areaBoss.action === "leap") {
-        areaBoss.vx = areaBoss.dir * 105;
+        if (areaBoss.timer <= 0) { areaBoss.action = "idle"; areaBoss.cooldown = .85; }
+      } else if (areaBoss.action === "tide") {
+        if (areaBoss.timer <= .42 && !areaBoss.attackFired) {
+          areaBoss.attackFired = true;
+          spawnGroundWavesAt(areaBoss.x + 38, groundY, "#69d8ca");
+          fireAimedVolley(areaBoss, 3, .48, 220, "#a0ffe9");
+        }
+        if (areaBoss.timer <= 0) { areaBoss.action = "idle"; areaBoss.cooldown = .75; }
+      } else if (areaBoss.cooldown <= 0) {
+        areaBoss.cycle++; areaBoss.attackFired = false;
+        areaBoss.action = areaBoss.cycle % 2 ? "vanish" : "tide";
+        areaBoss.timer = areaBoss.action === "vanish" ? .82 : .72;
+      }
+    } else if (areaBoss.kind === "forge") {
+      const groundY = areaBoss.groundY;
+      areaBoss.vy += 1350 * dt; areaBoss.x += areaBoss.vx * dt; areaBoss.y += areaBoss.vy * dt;
+      const landed = areaBoss.y + areaBoss.h >= groundY && areaBoss.vy > 90;
+      if (areaBoss.y + areaBoss.h >= groundY) { areaBoss.y = groundY - areaBoss.h; areaBoss.vy = 0; }
+      areaBoss.x = clamp(areaBoss.x, areaBoss.bounds[0], areaBoss.bounds[1]);
+      if (areaBoss.action === "ram") {
+        areaBoss.vx = areaBoss.dir * 390;
+        if (areaBoss.timer <= 0) { areaBoss.action = "idle"; areaBoss.cooldown = .62; }
+      } else if (areaBoss.action === "eruption") {
+        areaBoss.vx *= Math.pow(.02, dt);
+        if (areaBoss.timer <= .5 && !areaBoss.attackFired) {
+          areaBoss.attackFired = true;
+          for (let i = 0; i < 7; i++) {
+            const rainX = areaBoss.bounds[0] + 45 + i * 105;
+            fireBossProjectile(rainX, groundY - 330 - (i % 2) * 70, Math.PI / 2, 55, "#ff7548", 9, 240);
+          }
+          shake = 14;
+        }
+        if (areaBoss.timer <= 0) { areaBoss.action = "idle"; areaBoss.cooldown = .8; }
+      } else if (areaBoss.action === "anvil") {
+        areaBoss.vx = areaBoss.dir * 70;
         if (landed && areaBoss.timer < 1.15) {
-          spawnGroundWavesAt(areaBoss.x + areaBoss.w / 2, groundY, attackColor);
-          areaBoss.action = "idle";
-          areaBoss.cooldown = .8;
+          spawnGroundWavesAt(areaBoss.x + 42, groundY, "#ff9a55");
+          areaBoss.action = "idle"; areaBoss.cooldown = .75;
         }
       } else {
-        areaBoss.vx *= Math.pow(.03, dt);
+        areaBoss.vx *= Math.pow(.025, dt);
         if (areaBoss.cooldown <= 0) {
-          areaBoss.cycle++;
-          if (areaBoss.cycle % 3 === 1) {
-            areaBoss.action = "charge";
-            areaBoss.timer = .62;
-          } else if (areaBoss.cycle % 3 === 2) {
-            areaBoss.action = "leap";
-            areaBoss.timer = 1.55;
-            areaBoss.vy = -520;
-          } else {
-            fireAimedVolley(areaBoss, areaBoss.kind === "coast" ? 6 : 4,
-              areaBoss.kind === "coast" ? 1.05 : .75,
-              areaBoss.kind === "forge" ? 270 : 230, attackColor);
-            areaBoss.cooldown = .9;
+          areaBoss.cycle++; areaBoss.attackFired = false;
+          const skill = areaBoss.cycle % 3;
+          if (skill === 1) { areaBoss.action = "ram"; areaBoss.timer = .68; }
+          else if (skill === 2) { areaBoss.action = "eruption"; areaBoss.timer = 1.05; }
+          else { areaBoss.action = "anvil"; areaBoss.timer = 1.55; areaBoss.vy = -560; }
+        }
+      }
+    } else {
+      // 별포자 포식체는 지면을 쓰지 않고 공중 급강하와 회전 탄막으로 싸운다.
+      if (areaBoss.action !== "dive") areaBoss.y = areaBoss.baseY + Math.sin(time * 1.8) * 42;
+      areaBoss.x = clamp(areaBoss.x, areaBoss.bounds[0], areaBoss.bounds[1]);
+      if (areaBoss.action === "dive") {
+        areaBoss.x += areaBoss.vx * dt; areaBoss.y += areaBoss.vy * dt;
+        if (areaBoss.timer <= 0) { areaBoss.action = "idle"; areaBoss.cooldown = .72; }
+      } else if (areaBoss.action === "nova") {
+        if (areaBoss.timer <= .5 && !areaBoss.attackFired) {
+          areaBoss.attackFired = true;
+          for (let i = 0; i < 12; i++) {
+            fireBossProjectile(areaBoss.x + 43, areaBoss.y + 45, i * Math.PI / 6 + areaBoss.cycle * .17, 185, "#8edcff", 7);
           }
         }
+        if (areaBoss.timer <= 0) { areaBoss.action = "idle"; areaBoss.cooldown = .82; }
+      } else if (areaBoss.cooldown <= 0) {
+        areaBoss.cycle++; areaBoss.attackFired = false;
+        if (areaBoss.cycle % 2) {
+          const angle = Math.atan2(player.y - areaBoss.y, player.x - areaBoss.x);
+          areaBoss.action = "dive"; areaBoss.timer = .65;
+          areaBoss.vx = Math.cos(angle) * 430; areaBoss.vy = Math.sin(angle) * 430;
+        } else { areaBoss.action = "nova"; areaBoss.timer = .9; }
       }
     }
 
-    if (hitbox && overlap(hitbox, areaBoss) && areaBoss.lastAttack !== player.attackId) {
+    if (areaBoss.action !== "vanish" && hitbox && overlap(hitbox, areaBoss) && areaBoss.lastAttack !== player.attackId) {
       const attackPower = getAttackPower();
       areaBoss.lastAttack = player.attackId;
       areaBoss.hp -= attackPower;
@@ -2346,13 +2521,13 @@ function updateAreaBosses(dt) {
             : areaBoss.kind === "forge" ? "#ff7548" : "#8bdcff", 12, 170);
       if (areaBoss.hp <= 0) defeatAreaBoss(areaBoss);
     }
-    if (overlap(player, areaBoss)) hurt(1, areaBoss.x + areaBoss.w / 2);
+    if (areaBoss.action !== "vanish" && overlap(player, areaBoss)) hurt(1, areaBoss.x + areaBoss.w / 2);
   });
 }
 
 function updateBoss(dt) {
   const insideBellArena = save.shopItems.includes("bellKey")
-    && player.x > 5480 && player.y > 100 && player.y < 560;
+    && player.x > 5480 && getRegionAt(player.x, player.y) === "bell";
   if (!boss.dead) boss.active = insideBellArena;
   if (!boss.active || boss.dead) return;
   const enraged = boss.hp <= boss.maxHp / 2;
@@ -2364,9 +2539,9 @@ function updateBoss(dt) {
   boss.x += boss.vx * dt;
   boss.y += boss.vy * dt;
   let landed = false;
-  if (boss.y + boss.h >= FLOOR) {
+  if (boss.y + boss.h >= boss.groundY) {
     landed = boss.vy > 130;
-    boss.y = FLOOR - boss.h;
+    boss.y = boss.groundY - boss.h;
     boss.vy = 0;
   }
   boss.x = clamp(boss.x, 5350, 6080);
@@ -2378,7 +2553,7 @@ function updateBoss(dt) {
   } else if (boss.action === "slam") {
     boss.vx = boss.dir * (enraged ? 135 : 95);
     if (landed && boss.timer < 1.25) {
-      spawnShockwaves(boss.x + boss.w / 2, enraged);
+      spawnShockwaves(boss.x + boss.w / 2, enraged, boss.groundY);
       boss.action = "idle"; boss.cooldown = enraged ? .4 : .72;
     }
   } else if (boss.action === "volley") {
@@ -2397,7 +2572,11 @@ function updateBoss(dt) {
         beep(145, .2, "square", .045);
       } else {
         boss.action = "volley"; boss.timer = enraged ? .95 : .75;
-        fireAimedVolley(boss, enraged ? 7 : 5, enraged ? 1.35 : .9, enraged ? 315 : 265, "#c89bff");
+        const ringCount = enraged ? 14 : 10;
+        for (let i = 0; i < ringCount; i++) {
+          const angle = i * Math.PI * 2 / ringCount + boss.cycle * .21;
+          fireBossProjectile(boss.x + boss.w / 2, boss.y + 35, angle, enraged ? 235 : 195, "#c89bff", 8);
+        }
         puff(boss.x + boss.w / 2, boss.y + 32, "#d5a6ff", enraged ? 25 : 16, 170);
         beep(260, .34, "sine", .055);
       }
@@ -2668,6 +2847,7 @@ function drawBackground() {
 
 function drawExpandedRegionDetails() {
   ctx.save();
+  ctx.translate(0, DEPTH_OFFSETS.canopy);
 
   // 발광 균관 · 황혼 포자 온실
   ctx.fillStyle = "rgba(73,132,102,.12)";
@@ -2688,6 +2868,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("황혼 포자 온실", 1830, -865);
 
+  ctx.restore(); ctx.save(); ctx.translate(0, DEPTH_OFFSETS.clock);
   // 월광 포자탑 · 균륜 회랑
   ctx.fillStyle = "rgba(207,181,92,.07)";
   ctx.fillRect(5200, -1370, 2160, 330);
@@ -2710,6 +2891,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("월륜 균사 회랑", 5350, -1090);
 
+  ctx.restore(); ctx.save(); ctx.translate(0, DEPTH_OFFSETS.bell);
   // 균사 종루 · 공명의 수직 회랑
   ctx.fillStyle = "rgba(126,88,165,.09)";
   ctx.fillRect(5150, -620, 1120, 1095);
@@ -2725,6 +2907,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("공명의 수직 회랑", 5290, -325);
 
+  ctx.restore(); ctx.save(); ctx.translate(0, DEPTH_OFFSETS.roots);
   // 가라앉은 균근 · 공허한 하층림
   ctx.fillStyle = "rgba(91,54,116,.11)";
   ctx.fillRect(430, 620, 1880, 500);
@@ -2740,6 +2923,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("공허한 균근림", 600, 925);
 
+  ctx.restore(); ctx.save(); ctx.translate(0, DEPTH_OFFSETS.archive);
   // 침수 균문고 · 심층 배양서고
   ctx.fillStyle = "rgba(35,157,153,.1)";
   ctx.fillRect(2920, 1740, 4140, 590);
@@ -2762,6 +2946,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("가장 깊은 균문고", 3150, 2015);
 
+  ctx.restore(); ctx.save(); ctx.translate(0, DEPTH_OFFSETS.forge);
   // 잿빛 배양로 · 열균 배양장
   ctx.fillStyle = "rgba(255,85,37,.085)";
   ctx.fillRect(7820, 80, 3260, 470);
@@ -2777,6 +2962,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("열균 대배양장", 8000, 445);
 
+  ctx.restore(); ctx.save(); ctx.translate(0, DEPTH_OFFSETS.coast);
   // 별포자 습지 · 별무덤 방파제
   ctx.fillStyle = "rgba(80,164,216,.1)";
   ctx.fillRect(8620, 900, 3780, 480);
@@ -2873,14 +3059,14 @@ function drawWorld() {
     ctx.fillStyle = "rgba(144,239,194,.25)"; ctx.beginPath(); ctx.ellipse(x, 150 + (x % 70), 21, 5, 0, 0, Math.PI * 2); ctx.fill();
   }
 
-  // vertical garden landmarks
+  // 포자 정원 아래로 뻗는 균사 갱도: 모든 화살표가 아래쪽 세계를 가리킨다.
   ctx.save();
   ctx.strokeStyle = "rgba(104,151,126,.28)";
   ctx.lineWidth = 7;
   for (let x = 3160; x <= 3650; x += 95) {
     ctx.beginPath();
     ctx.moveTo(x, 430);
-    ctx.bezierCurveTo(x - 45, 180, x + 50, -170, x - 20, -650);
+    ctx.bezierCurveTo(x - 45, 610, x + 50, 780, x - 20, 980);
     ctx.stroke();
   }
   ctx.strokeStyle = "rgba(91,74,109,.3)";
@@ -2893,17 +3079,18 @@ function drawWorld() {
   }
   ctx.fillStyle = "rgba(194,232,211,.7)";
   ctx.font = "bold 16px system-ui";
-  ctx.fillText("↑  발광 균관", 3415, 330);
+  ctx.fillText("↓  발광 균관", 3415, 446);
   ctx.fillStyle = "rgba(202,174,224,.72)";
   ctx.fillText("↓  가라앉은 균근", 2815, 446);
   ctx.fillStyle = "rgba(246,218,132,.75)";
-  ctx.fillText("↑  균관 끝 · 월광 포자탑", 3260, -575);
+  ctx.fillText("↓  균관 심층 · 월광 포자탑", 3260, 1010);
   ctx.fillStyle = "rgba(105,220,207,.75)";
   ctx.fillText("→  균근 끝 · 침수 균문고", 3460, 930);
   ctx.restore();
 
   // moonlit spore tower
   ctx.save();
+  ctx.translate(0, DEPTH_OFFSETS.clock);
   ctx.strokeStyle = "rgba(232,205,114,.22)";
   ctx.lineWidth = 8;
   ctx.beginPath();
@@ -2939,6 +3126,7 @@ function drawWorld() {
 
   // flooded mycelial archive
   ctx.save();
+  ctx.translate(0, DEPTH_OFFSETS.archive);
   ctx.fillStyle = "rgba(47,161,157,.1)";
   ctx.fillRect(3920, 1140, 1330, 310);
   ctx.strokeStyle = "rgba(91,219,207,.22)";
@@ -2971,6 +3159,7 @@ function drawWorld() {
 
   // ashen incubator
   ctx.save();
+  ctx.translate(0, DEPTH_OFFSETS.forge);
   ctx.fillStyle = "rgba(255,93,45,.08)";
   ctx.fillRect(6180, 120, 1660, 430);
   ctx.strokeStyle = "rgba(255,119,65,.3)";
@@ -2998,6 +3187,7 @@ function drawWorld() {
 
   // star-spore marsh and the archive loop
   ctx.save();
+  ctx.translate(0, DEPTH_OFFSETS.coast);
   ctx.fillStyle = "rgba(90,169,226,.09)";
   ctx.fillRect(5200, 990, 3400, 460);
   ctx.strokeStyle = "rgba(135,211,255,.24)";
@@ -3489,10 +3679,23 @@ function drawElite(elite) {
   ctx.strokeStyle = elite.color;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const angle = i * Math.PI / 3 + time * .35;
-    ctx.moveTo(Math.cos(angle) * 27, Math.sin(angle) * 31 + 5);
-    ctx.lineTo(Math.cos(angle) * 38, Math.sin(angle) * 42 + 5);
+  if (elite.region === "canopy") {
+    ctx.moveTo(-20, 4); ctx.quadraticCurveTo(-48, -8, -42, -35);
+    ctx.moveTo(20, 4); ctx.quadraticCurveTo(48, -8, 42, -35);
+  } else if (elite.region === "roots") {
+    for (let i = -2; i <= 2; i++) { ctx.moveTo(i * 10, 28); ctx.quadraticCurveTo(i * 15, 43, i * 18, 53); }
+  } else if (elite.region === "clock") {
+    ctx.arc(0, 4, 42, time * .5, time * .5 + Math.PI * 1.6);
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + time; ctx.moveTo(Math.cos(a) * 32, Math.sin(a) * 32 + 4); ctx.lineTo(Math.cos(a) * 43, Math.sin(a) * 43 + 4); }
+  } else if (elite.region === "bell") {
+    ctx.moveTo(-24, 18); ctx.quadraticCurveTo(0, 48, 24, 18); ctx.moveTo(0, -34); ctx.lineTo(0, 43);
+  } else if (elite.region === "archive") {
+    for (let i = -2; i <= 2; i++) { ctx.moveTo(i * 11, 26); ctx.bezierCurveTo(i * 17, 38, i * 4, 46, i * 12, 55); }
+  } else if (elite.region === "forge") {
+    ctx.strokeRect(-35, -2, 70, 42); ctx.moveTo(-28, 8); ctx.lineTo(28, 30); ctx.moveTo(28, 8); ctx.lineTo(-28, 30);
+  } else {
+    ctx.moveTo(-25, 2); ctx.quadraticCurveTo(-53, 20, -44, 38); ctx.moveTo(25, 2); ctx.quadraticCurveTo(53, 20, 44, 38);
+    ctx.arc(0, 4, 40, time * .4, time * .4 + Math.PI * 1.2);
   }
   ctx.stroke();
   if (elite.action === "cast") {
@@ -3510,6 +3713,7 @@ function drawAreaBoss(areaBoss) {
   ctx.translate(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2);
   ctx.scale(areaBoss.dir, 1);
   if (areaBoss.hit > 0) ctx.globalAlpha = .52;
+  if (areaBoss.action === "vanish") ctx.globalAlpha = .12 + Math.abs(Math.sin(time * 18)) * .18;
 
   if (areaBoss.kind === "moon") {
     ctx.rotate(Math.sin(time * 1.8) * .08);
