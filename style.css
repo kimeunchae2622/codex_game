@@ -333,6 +333,109 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
   font-size: 14px !important;
 }
 
+.map-overlay {
+  z-index: 4;
+  display: block;
+  padding: 15px 18px 12px;
+  overflow-y: auto;
+  background:
+    linear-gradient(rgba(5, 12, 18, .96), rgba(2, 6, 11, .99)),
+    radial-gradient(circle at 35% 35%, rgba(69, 151, 129, .2), transparent 55%);
+  text-align: left;
+}
+
+.map-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(924px, 100%);
+  margin: 0 auto 9px;
+}
+
+.map-overlay h2 {
+  margin-top: 2px;
+  font-size: clamp(24px, 4vw, 36px);
+  letter-spacing: -.035em;
+}
+
+.map-overlay h3 { margin: 0; font-size: 14px; }
+.map-completion { color: #bff7d7; font-weight: 800; text-shadow: 0 0 16px #70e9ad88; }
+
+.map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(235px, .9fr);
+  gap: 10px;
+  width: min(924px, 100%);
+  height: 263px;
+  margin: auto;
+}
+
+.world-map-panel, .map-side-panel, .map-lower-panel > div {
+  min-height: 0;
+  border: 1px solid rgba(133, 219, 194, .2);
+  background: rgba(8, 19, 25, .82);
+  box-shadow: inset 0 0 32px rgba(0, 0, 0, .5);
+}
+
+.world-map-panel { position: relative; padding: 7px; }
+#worldMap { width: 100%; height: calc(100% - 20px); image-rendering: auto; }
+.map-legend { color: #809b9a; font-size: 10px; text-align: center; }
+.map-legend span { display: inline-block; margin-left: 10px; }
+.player-pin { width: 8px; height: 8px; border-radius: 50%; background: #fff2a2; box-shadow: 0 0 8px #fff2a2; }
+.camp-pin { width: 9px; height: 6px; border: 1px solid #8ce5d5; }
+.unknown-pin { color: #697a80; font-weight: 900; }
+
+.map-side-panel { padding: 9px; overflow-y: auto; scrollbar-color: #5c947f #101c20; }
+.objective-card { margin-bottom: 9px; padding: 9px 10px; border-left: 3px solid #86e5bd; background: rgba(73, 158, 127, .11); }
+.objective-card small { color: #7cb7a4; font-size: 10px; letter-spacing: .12em; }
+.objective-card h3 { margin: 3px 0; color: #e6fff4; font-size: 15px; }
+.objective-card p { color: #9fbab2; font-size: 11px; line-height: 1.45; }
+.panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.panel-title span { color: #78948d; font-size: 10px; }
+
+.contract-list { display: grid; gap: 5px; }
+.contract-card {
+  display: grid !important;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px !important;
+  width: 100%;
+  margin: 0 !important;
+  padding: 7px 8px !important;
+  border-radius: 5px !important;
+  text-align: left;
+  box-shadow: none !important;
+  background: rgba(38, 59, 65, .65) !important;
+}
+.contract-card b { font-size: 11px; }
+.contract-card small { grid-column: 1; color: #829c98; font-size: 9px; }
+.contract-card em { grid-column: 2; grid-row: 1 / 3; align-self: center; color: #ffd98b; font-size: 10px; font-style: normal; }
+.contract-card.ready { border-color: #e9ce75 !important; background: rgba(105, 87, 36, .38) !important; }
+.contract-card.claimed { opacity: .48; cursor: default; }
+
+.map-lower-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: min(924px, 100%);
+  height: 132px;
+  margin: 10px auto 0;
+}
+.map-lower-panel > div { padding: 8px; overflow: hidden; }
+.region-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.region-card { padding: 6px; border: 1px solid rgba(133, 196, 181, .14); color: #8aa09d; background: #0c171c; }
+.region-card.visited { color: #d8eee8; border-color: color-mix(in srgb, var(--region-color) 45%, transparent); }
+.region-card b { display: block; overflow: hidden; font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+.region-card small { color: #66807a; font-size: 8px; }
+.region-card i { display: block; height: 2px; margin-top: 4px; background: linear-gradient(90deg, var(--region-color) var(--progress), #263438 var(--progress)); }
+
+.bestiary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.bestiary-entry { min-width: 0; padding: 6px; color: #71827f; border: 1px solid rgba(131, 190, 174, .12); background: #0b151a; }
+.bestiary-entry.found { color: #dcf4eb; border-color: rgba(124, 220, 189, .3); }
+.bestiary-entry b { display: block; overflow: hidden; font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+.bestiary-entry small { color: #718b84; font-size: 8px; }
+.map-exit-hint { margin-top: 7px !important; color: #7f9993 !important; font-size: 10px !important; text-align: center; }
+.map-exit-hint kbd { min-width: 20px; padding: 2px 5px; }
+
 #toast {
   position: absolute;
   left: 50%;
@@ -415,4 +518,10 @@ footer { margin-top: 15px; color: #6f7c96; text-align: center; font-size: 13px; 
   .equipment-panel { display: none; }
   .sigil-grid { grid-template-columns: 1fr; }
   .inventory-heading { align-items: center; }
+  .map-overlay { padding: 10px; }
+  .map-layout { grid-template-columns: 1fr; height: auto; }
+  .world-map-panel { height: 245px; }
+  .map-side-panel { max-height: 170px; }
+  .map-lower-panel { grid-template-columns: 1fr; height: auto; }
+  .map-lower-panel > div { min-height: 115px; }
 }

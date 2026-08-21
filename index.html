@@ -15,6 +15,7 @@
         <h1>짭로나이트</h1>
       </div>
       <div class="header-actions">
+        <button id="mapButton" type="button">지도 · 도감</button>
         <button id="settingsButton" type="button">설정</button>
         <button id="soundButton" type="button" aria-pressed="true">음악·효과음 끄기</button>
       </div>
@@ -72,6 +73,43 @@
         </div>
         <p id="inventoryMessage" class="inventory-message">방향키로 선택 · Z 장착/해제 · I 또는 A 닫기</p>
       </div>
+      <div id="mapScreen" class="overlay map-overlay hidden">
+        <div class="map-heading">
+          <div>
+            <p class="kicker">균사 왕국 탐사 기록</p>
+            <h2>지도 · 의뢰 · 균류 도감</h2>
+          </div>
+          <div id="mapCompletion" class="map-completion">탐사율 0%</div>
+        </div>
+        <div class="map-layout">
+          <section class="world-map-panel">
+            <canvas id="worldMap" width="720" height="340" aria-label="균사 왕국 탐험 지도"></canvas>
+            <div class="map-legend"><span class="player-pin"></span> 현재 위치 <span class="camp-pin"></span> 휴식 지점 <span class="unknown-pin">?</span> 미탐사 지역</div>
+          </section>
+          <aside class="map-side-panel">
+            <section class="objective-card">
+              <small>현재 목표</small>
+              <h3 id="mapObjectiveTitle">포자 정원 조사</h3>
+              <p id="mapObjectiveText"></p>
+            </section>
+            <section>
+              <div class="panel-title"><h3>탐사 의뢰</h3><span id="contractCount">0 / 5</span></div>
+              <div id="contractList" class="contract-list"></div>
+            </section>
+          </aside>
+        </div>
+        <section class="map-lower-panel">
+          <div>
+            <div class="panel-title"><h3>지역 진행률</h3><span id="visitedCount">1 / 8</span></div>
+            <div id="regionProgress" class="region-progress"></div>
+          </div>
+          <div>
+            <div class="panel-title"><h3>균류 도감</h3><span id="bestiaryCount">0 / 6</span></div>
+            <div id="bestiaryGrid" class="bestiary-grid"></div>
+          </div>
+        </section>
+        <p class="map-exit-hint"><kbd>M</kbd> 또는 <kbd>Esc</kbd>로 닫기 · 완료된 의뢰를 눌러 보상을 받으세요</p>
+      </div>
       <div id="settingsScreen" class="overlay settings-overlay hidden">
         <p class="kicker">플레이 환경</p>
         <h2>설정</h2>
@@ -106,6 +144,7 @@
       <div><kbd>X</kbd><span>공격</span></div>
       <div><kbd>C</kbd><span>대시</span></div>
       <div><kbd>I</kbd><span>인벤토리</span></div>
+      <div><kbd>M</kbd><span>지도 · 도감</span></div>
       <div><kbd>A</kbd><span>상점 나가기</span></div>
       <div><kbd>Esc</kbd><span>일시정지</span></div>
     </section>
@@ -120,6 +159,7 @@
         <button data-key="KeyZ">Z<small>점프</small></button>
         <button data-key="KeyX">X<small>공격</small></button>
         <button data-key="KeyC">C<small>대시</small></button>
+        <button id="touchMapButton" type="button">M<small>지도</small></button>
       </div>
     </section>
 

@@ -18,6 +18,18 @@ const sigilSlotCountEl = document.querySelector("#sigilSlotCount");
 const sigilSlotPipsEl = document.querySelector("#sigilSlotPips");
 const sigilOwnedCountEl = document.querySelector("#sigilOwnedCount");
 const inventoryMessageEl = document.querySelector("#inventoryMessage");
+const mapScreen = document.querySelector("#mapScreen");
+const worldMapCanvas = document.querySelector("#worldMap");
+const worldMapCtx = worldMapCanvas.getContext("2d");
+const mapCompletionEl = document.querySelector("#mapCompletion");
+const mapObjectiveTitleEl = document.querySelector("#mapObjectiveTitle");
+const mapObjectiveTextEl = document.querySelector("#mapObjectiveText");
+const contractCountEl = document.querySelector("#contractCount");
+const contractListEl = document.querySelector("#contractList");
+const visitedCountEl = document.querySelector("#visitedCount");
+const regionProgressEl = document.querySelector("#regionProgress");
+const bestiaryCountEl = document.querySelector("#bestiaryCount");
+const bestiaryGridEl = document.querySelector("#bestiaryGrid");
 const settingsScreen = document.querySelector("#settingsScreen");
 const musicVolumeInput = document.querySelector("#musicVolume");
 const sfxVolumeInput = document.querySelector("#sfxVolume");
@@ -79,6 +91,7 @@ let running = false;
 let paused = false;
 let shopOpen = false;
 let inventoryOpen = false;
+let mapOpen = false;
 let settingsOpen = false;
 let settingsResumeGame = false;
 let settingsOpenedFromPause = false;
@@ -144,7 +157,7 @@ const saveDefault = {
   ownedSigils: [], equippedSigils: [], sigilSlots: 3,
   slotUpgrades: [], slotRewards: [],
   bellBossDefeated: false, resonance: false, forgeHeart: false, endingSeen: false,
-  eliteDefeated: [], discoveries: [], layoutVersion: 2
+  eliteDefeated: [], discoveries: [], visitedRegions: ["garden"], claimedContracts: [], layoutVersion: 2
 };
 let save = loadSave();
 
@@ -153,6 +166,9 @@ function loadSave() {
     const raw = JSON.parse(localStorage.getItem("forgottenGarden") || "{}");
     const loaded = { ...saveDefault, ...raw };
     if (!("layoutVersion" in raw)) loaded.layoutVersion = 1;
+    if (!Array.isArray(loaded.visitedRegions)) loaded.visitedRegions = ["garden"];
+    if (!loaded.visitedRegions.includes("garden")) loaded.visitedRegions.unshift("garden");
+    if (!Array.isArray(loaded.claimedContracts)) loaded.claimedContracts = [];
     delete loaded.memories;
     return loaded;
   }
@@ -1308,6 +1324,195 @@ function moveInventorySelection(code) {
   beep(380 + inventorySelection * 12, .035, "sine", .015);
 }
 
+const mapRegionOrder = ["garden", "canopy", "clock", "bell", "roots", "archive", "forge", "coast"];
+const mapRegionZones = {
+  garden: [0, 0, 5100, 620], canopy: [1650, 720, 2050, 650],
+  clock: [5150, 1420, 2300, 520], bell: [5050, 2100, 1350, 1230],
+  roots: [350, 2820, 2150, 690], archive: [2850, 3580, 4300, 900],
+  forge: [7750, 4310, 3450, 710], coast: [8500, 5150, 3900, 720]
+};
+
+const bestiaryCatalog = {
+  crawler: { name: "이끼 포복자", mark: "♣", text: "바닥의 진동을 좇아 돌진하는 균핵" },
+  flyer: { name: "공명 포자충", mark: "✣", text: "천장 균사에서 태어난 급강하 포식자" },
+  clockwork: { name: "태엽 균륜", mark: "◉", text: "시간 포자를 탄환처럼 분사하는 군체" },
+  inkling: { name: "먹물 포자령", mark: "☵", text: "침수된 기록을 몸에 새긴 유영체" },
+  emberling: { name: "불씨 버섯병", mark: "♠", text: "열을 먹고 자라 지면을 폭발시키는 균" },
+  starling: { name: "별포자 유영체", mark: "✦", text: "해안의 빛을 삼켜 고리 탄막을 만든다" }
+};
+
+function defeatedBossCount() {
+  return Number(save.midBossDefeated) + Number(save.bellBossDefeated)
+    + save.areaBosses.length + save.eliteDefeated.length;
+}
+
+const explorationContracts = [
+  { id: "first_chart", name: "지하의 첫 지도", detail: "서로 다른 지역 4곳 방문", target: 4, reward: 12, progress: () => save.visitedRegions.length },
+  { id: "lore_keeper", name: "잠든 균사의 목소리", detail: "탐험 기록 6개 조사", target: 6, reward: 15, progress: () => save.discoveries.length },
+  { id: "spore_hunter", name: "포자 개체수 조사", detail: "일반 몬스터 12마리 처치", target: 12, reward: 18, progress: () => save.defeated.length },
+  { id: "warden_breaker", name: "수호자 표본", detail: "중간·지역 보스 3체 처치", target: 3, reward: 24, progress: defeatedBossCount },
+  { id: "kingdom_atlas", name: "균사 왕국 대지도", detail: "8개 지역과 기록 16개 완성", target: 24, reward: 35, progress: () => save.visitedRegions.length + save.discoveries.length }
+];
+
+function regionBossComplete(region) {
+  if (region === "garden") return save.midBossDefeated;
+  if (region === "bell") return save.bellBossDefeated;
+  const areaBossByRegion = { clock: "moonKeeper", archive: "archiveKeeper", forge: "forgeCore", coast: "starDevourer" };
+  if (areaBossByRegion[region]) return save.areaBosses.includes(areaBossByRegion[region]);
+  const regionalElites = eliteDefs.filter(elite => elite.region === region);
+  return regionalElites.length > 0 && regionalElites.every(elite => save.eliteDefeated.includes(elite.id));
+}
+
+function regionProgressValue(region) {
+  if (!save.visitedRegions.includes(region)) return 0;
+  const records = landmarks.filter(landmark => getRegionAt(landmark.x, landmark.y) === region);
+  const found = records.filter(landmark => save.discoveries.includes(landmark.id)).length;
+  const recordProgress = records.length ? found / records.length : 1;
+  return Math.round(25 + recordProgress * 35 + Number(regionBossComplete(region)) * 40);
+}
+
+function currentObjective() {
+  if (!save.dash) return ["그림자 대시 찾기", "포자 정원 깊은 곳에서 균사 이동 능력을 깨우세요."];
+  if (save.echoes.length < 3) return ["세 개의 메아리", `포자 정원의 메아리 조각을 모으세요. ${save.echoes.length} / 3`];
+  if (!save.midBossDefeated) return ["청록 균사수문장", "정원 동쪽의 수문장을 쓰러뜨려 하층 통로를 여세요."];
+  if (!save.areaBosses.includes("moonKeeper")) return ["월광 포자탑의 맥박", "빛의 수관 아래 월광 포자탑을 조사하고 수호자를 잠재우세요."];
+  if (!save.bellBossDefeated) return ["균사 종루의 공명", "종루 중심부에서 사연 균종지기와 대면하세요."];
+  if (!save.areaBosses.includes("forgeCore")) return ["잿빛 제련소 점화", "종루의 공명으로 제련소 심부를 깨우세요."];
+  if (!save.areaBosses.includes("starDevourer")) return ["별잠 해안의 포식자", "제련소에서 얻은 내성으로 해안 끝의 포자 포식자를 추적하세요."];
+  if (save.discoveries.length < landmarks.length) return ["왕국의 남은 목소리", `아직 읽지 못한 탐험 기록이 ${landmarks.length - save.discoveries.length}개 남았습니다.`];
+  return ["완성된 균사 순환", "모든 길이 이어졌습니다. 인장 조합과 숨은 수호자를 마저 찾아보세요."];
+}
+
+function drawWorldMap() {
+  const map = worldMapCtx;
+  const mw = worldMapCanvas.width;
+  const mh = worldMapCanvas.height;
+  const pad = 16;
+  const sx = x => pad + x / WORLD_W * (mw - pad * 2);
+  const sy = y => pad + (y - WORLD_TOP) / (WORLD_BOTTOM - WORLD_TOP) * (mh - pad * 2);
+  map.clearRect(0, 0, mw, mh);
+  const background = map.createLinearGradient(0, 0, 0, mh);
+  background.addColorStop(0, "#0b1b20"); background.addColorStop(1, "#04090d");
+  map.fillStyle = background; map.fillRect(0, 0, mw, mh);
+  map.strokeStyle = "rgba(129,191,177,.07)"; map.lineWidth = 1;
+  for (let x = 0; x <= mw; x += 36) { map.beginPath(); map.moveTo(x, 0); map.lineTo(x, mh); map.stroke(); }
+  for (let y = 0; y <= mh; y += 34) { map.beginPath(); map.moveTo(0, y); map.lineTo(mw, y); map.stroke(); }
+
+  mapRegionOrder.forEach(region => {
+    const [x, y, w, h] = mapRegionZones[region];
+    const visited = save.visitedRegions.includes(region);
+    const palette = fungalPalettes[region];
+    map.globalAlpha = visited ? .2 : .055;
+    map.fillStyle = visited ? palette.ridge : "#738184";
+    map.beginPath(); map.roundRect(sx(x), sy(y), sx(x + w) - sx(x), sy(y + h) - sy(y), 7); map.fill();
+    map.globalAlpha = visited ? .62 : .18;
+    map.strokeStyle = visited ? palette.glow : "#627176"; map.lineWidth = visited ? 2 : 1;
+    map.stroke();
+    map.globalAlpha = 1;
+    map.fillStyle = visited ? "#d9eee8" : "#607075";
+    map.font = visited ? "bold 12px system-ui" : "bold 18px system-ui";
+    map.textAlign = "center";
+    map.fillText(visited ? regionNames[region] : "?", sx(x + w / 2), sy(y + h / 2) + 4);
+  });
+
+  map.globalAlpha = .82;
+  [...platforms, ...movingPlatforms].forEach(platform => {
+    const region = getRegionAt(platform.x + platform.w / 2, platform.y);
+    if (!save.visitedRegions.includes(region)) return;
+    map.fillStyle = fungalPalettes[region].ridge;
+    map.fillRect(sx(platform.x), sy(platform.y), Math.max(1, sx(platform.x + platform.w) - sx(platform.x)), Math.max(1, (platform.h / (WORLD_BOTTOM - WORLD_TOP)) * (mh - pad * 2)));
+  });
+  map.globalAlpha = 1;
+  checkpointData.forEach(checkpoint => {
+    const region = getRegionAt(checkpoint.x, checkpoint.y);
+    if (!save.visitedRegions.includes(region)) return;
+    map.strokeStyle = "#83ddce"; map.lineWidth = 1;
+    map.strokeRect(sx(checkpoint.x) - 2, sy(checkpoint.y) - 2, 5, 5);
+  });
+  map.fillStyle = "#fff1a0"; map.shadowColor = "#fff1a0"; map.shadowBlur = 10;
+  map.beginPath(); map.arc(sx(player.x + player.w / 2), sy(player.y + player.h / 2), 4, 0, Math.PI * 2); map.fill();
+  map.shadowBlur = 0;
+}
+
+function renderMapScreen() {
+  const visited = save.visitedRegions.length;
+  const completion = Math.round(mapRegionOrder.reduce((sum, region) => sum + regionProgressValue(region), 0) / mapRegionOrder.length);
+  mapCompletionEl.textContent = `왕국 탐사율 ${completion}%`;
+  visitedCountEl.textContent = `${visited} / ${mapRegionOrder.length}`;
+  const [objectiveTitle, objectiveText] = currentObjective();
+  mapObjectiveTitleEl.textContent = objectiveTitle;
+  mapObjectiveTextEl.textContent = objectiveText;
+  drawWorldMap();
+
+  regionProgressEl.innerHTML = mapRegionOrder.map(region => {
+    const value = regionProgressValue(region);
+    const visitedRegion = save.visitedRegions.includes(region);
+    return `<article class="region-card ${visitedRegion ? "visited" : ""}" style="--region-color:${fungalPalettes[region].ridge};--progress:${value}%"><b>${visitedRegion ? regionNames[region] : "미탐사 균사층"}</b><small>${visitedRegion ? `완성도 ${value}%` : "좌표 없음"}</small><i></i></article>`;
+  }).join("");
+
+  const defeatedTypes = save.defeated.reduce((counts, id) => {
+    const type = enemySeeds[id]?.[2];
+    if (type) counts[type] = (counts[type] || 0) + 1;
+    return counts;
+  }, {});
+  const foundTypes = Object.keys(bestiaryCatalog).filter(type => defeatedTypes[type]).length;
+  bestiaryCountEl.textContent = `${foundTypes} / ${Object.keys(bestiaryCatalog).length}`;
+  bestiaryGridEl.innerHTML = Object.entries(bestiaryCatalog).map(([type, entry]) => {
+    const count = defeatedTypes[type] || 0;
+    return `<article class="bestiary-entry ${count ? "found" : ""}" title="${count ? entry.text : "처치 후 기록됩니다"}"><b>${count ? `${entry.mark} ${entry.name}` : "？ 미확인 균류"}</b><small>${count ? `처치 ${count}` : "기록 없음"}</small></article>`;
+  }).join("");
+
+  contractListEl.replaceChildren();
+  explorationContracts.forEach(contract => {
+    const progress = Math.min(contract.target, contract.progress());
+    const claimed = save.claimedContracts.includes(contract.id);
+    const ready = progress >= contract.target && !claimed;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `contract-card ${ready ? "ready" : ""} ${claimed ? "claimed" : ""}`;
+    button.disabled = claimed || !ready;
+    button.innerHTML = `<b>${claimed ? "✓ " : ""}${contract.name}</b><small>${contract.detail} · ${progress}/${contract.target}</small><em>${claimed ? "완료" : ready ? `보상 받기 ${contract.reward} ◈` : `${contract.reward} ◈`}</em>`;
+    button.addEventListener("click", () => claimContract(contract.id));
+    contractListEl.append(button);
+  });
+  contractCountEl.textContent = `${save.claimedContracts.length} / ${explorationContracts.length}`;
+}
+
+function claimContract(id) {
+  const contract = explorationContracts.find(item => item.id === id);
+  if (!contract || save.claimedContracts.includes(id) || contract.progress() < contract.target) return;
+  save.claimedContracts.push(id);
+  save.coins += contract.reward;
+  storeSave();
+  renderMapScreen();
+  toast(`${contract.name} 완료 · ${contract.reward} ◈ 획득`, 3000);
+  beep(760, .28, "sine", .05);
+}
+
+function openMap() {
+  if (!running || paused || shopOpen || inventoryOpen || settingsOpen) return;
+  mapOpen = true;
+  keys.clear(); taps.clear();
+  renderMapScreen();
+  mapScreen.classList.remove("hidden");
+}
+
+function closeMap() {
+  mapOpen = false;
+  mapScreen.classList.add("hidden");
+  keys.delete("KeyM"); taps.delete("KeyM");
+  last = performance.now();
+}
+
+function trackVisitedRegion() {
+  const region = getRegionAt(player.x + player.w / 2, player.y + player.h / 2);
+  if (save.visitedRegions.includes(region)) return;
+  save.visitedRegions.push(region);
+  storeSave();
+  toast(`새 지역 지도 기록 · ${regionNames[region]}`, 3200);
+  beep(610, .18, "triangle", .035);
+}
+
 function syncSettingsUI() {
   const musicPercent = Math.round(gameSettings.musicVolume * 100);
   const sfxPercent = Math.round(gameSettings.sfxVolume * 100);
@@ -1366,7 +1571,11 @@ addEventListener("keydown", e => {
     }
     return;
   }
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "KeyI", "Escape"].includes(e.code)) e.preventDefault();
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "KeyI", "KeyM", "Escape"].includes(e.code)) e.preventDefault();
+  if (mapOpen) {
+    if (e.code === "KeyM" || e.code === "KeyA" || e.code === "Escape") closeMap();
+    return;
+  }
   if (shopOpen) {
     if (e.code === "KeyA") closeShop();
     else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) moveShopSelection(e.code);
@@ -1384,6 +1593,10 @@ addEventListener("keydown", e => {
   keys.add(e.code);
   if (e.code === "KeyI" && running && !paused && firstPress && !e.repeat) {
     openInventory();
+    return;
+  }
+  if (e.code === "KeyM" && running && !paused && firstPress && !e.repeat) {
+    openMap();
     return;
   }
   if (e.code === "Escape" && running && firstPress && !e.repeat) togglePause();
@@ -1413,6 +1626,8 @@ document.querySelector("#startButton").addEventListener("click", () => {
   startGameLoop();
 });
 document.querySelector("#resumeButton").addEventListener("click", togglePause);
+document.querySelector("#mapButton").addEventListener("click", openMap);
+document.querySelector("#touchMapButton").addEventListener("click", openMap);
 document.querySelector("#settingsButton").addEventListener("click", openSettings);
 document.querySelector("#pauseSettingsButton").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsButton").addEventListener("click", closeSettings);
@@ -2647,6 +2862,7 @@ function update(dt) {
   time += dt;
   updatePlatforms(dt);
   updatePlayer(dt);
+  trackVisitedRegion();
   updateEnemies(dt);
   updateCoins(dt);
   updateMidBoss(dt);
@@ -4394,7 +4610,7 @@ function loop(now, generation) {
   if (!running || paused || generation !== loopGeneration) return;
   const dt = Math.min((now - last) / 1000, .033);
   last = now;
-  if (!shopOpen && !inventoryOpen) update(dt);
+  if (!shopOpen && !inventoryOpen && !mapOpen) update(dt);
   else taps.clear();
   updateMusic();
   render();
