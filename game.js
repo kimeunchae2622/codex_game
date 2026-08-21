@@ -308,6 +308,7 @@ const platforms = [
   { x: 3480, y: 890, w: 170, h: 18 },
   { x: 2780, y: 820, w: 105, h: 18 },
   { x: 3015, y: 820, w: 105, h: 18 },
+  { x: 3100, y: 900, w: 120, h: 18 },
   { x: 2300, y: 960, w: 600, h: 160 },
   { x: 3000, y: 960, w: 650, h: 160 },
 
@@ -319,7 +320,7 @@ const platforms = [
   { x: 4055, y: -920, w: 125, h: 16 },
   { x: 4210, y: -995, w: 150, h: 16 },
   { x: 4360, y: -1060, w: 800, h: 170 },
-  { x: 4440, y: -1155, w: 125, h: 18 },
+  { x: 4440, y: -1140, w: 125, h: 18 },
   { x: 4640, y: -1220, w: 135, h: 18 },
   { x: 4830, y: -1160, w: 145, h: 18 },
   { x: 5000, y: -1230, w: 150, h: 18 },
@@ -328,7 +329,7 @@ const platforms = [
   { x: 3650, y: 1035, w: 135, h: 18 },
   { x: 3815, y: 1110, w: 135, h: 18 },
   { x: 3980, y: 1190, w: 1210, h: 190 },
-  { x: 4140, y: 1090, w: 155, h: 18 },
+  { x: 4140, y: 1110, w: 155, h: 18 },
   { x: 4410, y: 1030, w: 145, h: 18 },
   { x: 4680, y: 1085, w: 150, h: 18 },
   { x: 4950, y: 1015, w: 155, h: 18 },
@@ -341,16 +342,19 @@ const platforms = [
   { x: 6500, y: 338, w: 145, h: 18 },
   { x: 6740, y: 395, w: 130, h: 18 },
   { x: 6950, y: 325, w: 145, h: 18 },
-  { x: 7180, y: 388, w: 140, h: 18 },
+  { x: 7180, y: 395, w: 140, h: 18 },
   { x: 7440, y: 330, w: 155, h: 18 },
 
   // forge descent into the sleeping coast
   { x: 7660, y: 545, w: 150, h: 18 },
-  { x: 7460, y: 645, w: 140, h: 18 },
-  { x: 7640, y: 745, w: 145, h: 18 },
-  { x: 7440, y: 845, w: 145, h: 18 },
-  { x: 7610, y: 945, w: 155, h: 18 },
-  { x: 7410, y: 1045, w: 150, h: 18 },
+  { x: 7460, y: 615, w: 140, h: 18 },
+  { x: 7640, y: 685, w: 145, h: 18 },
+  { x: 7440, y: 755, w: 145, h: 18 },
+  { x: 7610, y: 825, w: 155, h: 18 },
+  { x: 7410, y: 895, w: 150, h: 18 },
+  { x: 7580, y: 965, w: 145, h: 18 },
+  { x: 7380, y: 1035, w: 145, h: 18 },
+  { x: 7550, y: 1110, w: 150, h: 18 },
 
   // sleeping coast and its loop back to the flooded archive
   { x: 5290, y: 1190, w: 590, h: 190 },
@@ -358,22 +362,22 @@ const platforms = [
   { x: 6600, y: 1190, w: 420, h: 190 },
   { x: 7120, y: 1190, w: 500, h: 190 },
   { x: 7720, y: 1190, w: 880, h: 190 },
-  { x: 5480, y: 1090, w: 150, h: 18 },
+  { x: 5480, y: 1110, w: 150, h: 18 },
   { x: 5750, y: 1030, w: 145, h: 18 },
-  { x: 6100, y: 1090, w: 150, h: 18 },
-  { x: 6380, y: 1020, w: 155, h: 18 },
-  { x: 6780, y: 1080, w: 145, h: 18 },
-  { x: 7060, y: 1015, w: 150, h: 18 },
-  { x: 7930, y: 1080, w: 145, h: 18 },
-  { x: 8230, y: 1020, w: 155, h: 18 },
+  { x: 6100, y: 1110, w: 150, h: 18 },
+  { x: 6380, y: 1030, w: 155, h: 18 },
+  { x: 6780, y: 1110, w: 145, h: 18 },
+  { x: 7060, y: 1030, w: 150, h: 18 },
+  { x: 7930, y: 1110, w: 145, h: 18 },
+  { x: 8200, y: 1030, w: 155, h: 18 },
 
   // expanded light canopy: the dusk-vein conservatory
   { x: 3050, y: -620, w: 130, h: 16 },
   { x: 2850, y: -690, w: 135, h: 16 },
-  { x: 2630, y: -755, w: 145, h: 16 },
+  { x: 2630, y: -760, w: 145, h: 16 },
   { x: 1780, y: -840, w: 760, h: 100 },
   { x: 2640, y: -840, w: 880, h: 100 },
-  { x: 1910, y: -945, w: 130, h: 16 },
+  { x: 1910, y: -920, w: 130, h: 16 },
   { x: 2160, y: -900, w: 150, h: 16 },
   { x: 2460, y: -970, w: 140, h: 16 },
   { x: 2760, y: -915, w: 155, h: 16 },
@@ -384,70 +388,74 @@ const platforms = [
   // expanded moonlit clocktower: orrery galleries
   { x: 5260, y: -1060, w: 930, h: 170 },
   { x: 6290, y: -1060, w: 1010, h: 170 },
-  { x: 5300, y: -1160, w: 145, h: 18 },
-  { x: 5540, y: -1235, w: 155, h: 18 },
+  { x: 5300, y: -1140, w: 145, h: 18 },
+  { x: 5540, y: -1220, w: 155, h: 18 },
   { x: 5800, y: -1165, w: 140, h: 18 },
-  { x: 6060, y: -1260, w: 150, h: 18 },
+  { x: 6060, y: -1245, w: 150, h: 18 },
   { x: 6350, y: -1175, w: 145, h: 18 },
   { x: 6620, y: -1250, w: 155, h: 18 },
   { x: 6900, y: -1165, w: 150, h: 18 },
 
   // expanded bell tower: vertical resonance nave
-  { x: 5290, y: 370, w: 125, h: 17 },
-  { x: 5480, y: 285, w: 135, h: 17 },
-  { x: 5700, y: 200, w: 130, h: 17 },
-  { x: 5920, y: 115, w: 145, h: 17 },
-  { x: 5680, y: 30, w: 135, h: 17 },
-  { x: 5460, y: -55, w: 140, h: 17 },
-  { x: 5260, y: -140, w: 135, h: 17 },
-  { x: 5200, y: -300, w: 1020, h: 90 },
-  { x: 5480, y: -400, w: 150, h: 17 },
-  { x: 5790, y: -455, w: 155, h: 17 },
+  { x: 5290, y: 400, w: 125, h: 17 },
+  { x: 5480, y: 325, w: 135, h: 17 },
+  { x: 5700, y: 250, w: 130, h: 17 },
+  { x: 5920, y: 175, w: 145, h: 17 },
+  { x: 5680, y: 100, w: 135, h: 17 },
+  { x: 5460, y: 25, w: 140, h: 17 },
+  { x: 5260, y: -50, w: 135, h: 17 },
+  { x: 5450, y: -125, w: 140, h: 17 },
+  { x: 5650, y: -200, w: 140, h: 17 },
+  { x: 5200, y: -275, w: 1020, h: 90 },
+  { x: 5480, y: -350, w: 150, h: 17 },
+  { x: 5790, y: -425, w: 155, h: 17 },
 
   // expanded sunken roots: hollow undergrowth
   { x: 500, y: 960, w: 720, h: 160 },
   { x: 1320, y: 960, w: 880, h: 160 },
-  { x: 620, y: 860, w: 145, h: 18 },
-  { x: 900, y: 790, w: 155, h: 18 },
-  { x: 1190, y: 850, w: 140, h: 18 },
-  { x: 1510, y: 775, w: 150, h: 18 },
-  { x: 1800, y: 840, w: 145, h: 18 },
-  { x: 2070, y: 780, w: 145, h: 18 },
+  { x: 620, y: 885, w: 145, h: 18 },
+  { x: 900, y: 810, w: 155, h: 18 },
+  { x: 1190, y: 885, w: 140, h: 18 },
+  { x: 1510, y: 810, w: 150, h: 18 },
+  { x: 1800, y: 885, w: 145, h: 18 },
+  { x: 2070, y: 810, w: 145, h: 18 },
 
   // expanded flooded archive: drowned stacks
-  { x: 5160, y: 1300, w: 135, h: 18 },
-  { x: 5360, y: 1400, w: 145, h: 18 },
-  { x: 5550, y: 1510, w: 145, h: 18 },
-  { x: 5330, y: 1620, w: 150, h: 18 },
-  { x: 5100, y: 1730, w: 150, h: 18 },
-  { x: 4860, y: 1840, w: 145, h: 18 },
+  { x: 5195, y: 1265, w: 90, h: 18, oneWay: true },
+  { x: 5195, y: 1340, w: 90, h: 18, oneWay: true },
+  { x: 5100, y: 1415, w: 145, h: 18 },
+  { x: 4900, y: 1490, w: 150, h: 18 },
+  { x: 5100, y: 1565, w: 150, h: 18 },
+  { x: 4900, y: 1640, w: 145, h: 18 },
+  { x: 5100, y: 1715, w: 145, h: 18 },
   { x: 3000, y: 2050, w: 800, h: 220 },
   { x: 3900, y: 2050, w: 780, h: 220 },
   { x: 4780, y: 2050, w: 820, h: 220 },
   { x: 5700, y: 2050, w: 690, h: 220 },
   { x: 6490, y: 2050, w: 510, h: 220 },
-  { x: 3220, y: 1940, w: 150, h: 18 },
-  { x: 3500, y: 1860, w: 145, h: 18 },
-  { x: 3810, y: 1940, w: 155, h: 18 },
-  { x: 4200, y: 1840, w: 145, h: 18 },
+  { x: 3220, y: 1970, w: 150, h: 18 },
+  { x: 3500, y: 1890, w: 145, h: 18 },
+  { x: 3810, y: 1970, w: 155, h: 18 },
+  { x: 4000, y: 1930, w: 145, h: 18 },
+  { x: 4200, y: 1860, w: 145, h: 18 },
   { x: 4500, y: 1930, w: 150, h: 18 },
-  { x: 5900, y: 1920, w: 150, h: 18 },
-  { x: 6200, y: 1840, w: 155, h: 18 },
+  { x: 5900, y: 1970, w: 150, h: 18 },
+  { x: 6175, y: 1890, w: 155, h: 18 },
 
   // expanded ashen forge: grand foundry
   { x: 7900, y: FLOOR, w: 680, h: 130 },
   { x: 8680, y: FLOOR, w: 720, h: 130 },
   { x: 9500, y: FLOOR, w: 660, h: 130 },
   { x: 10260, y: FLOOR, w: 740, h: 130 },
-  { x: 8060, y: 385, w: 145, h: 18 },
-  { x: 8320, y: 315, w: 150, h: 18 },
+  { x: 8060, y: 400, w: 145, h: 18 },
+  { x: 8320, y: 325, w: 150, h: 18 },
   { x: 8660, y: 390, w: 140, h: 18 },
-  { x: 8940, y: 305, w: 155, h: 18 },
+  { x: 8940, y: 315, w: 155, h: 18 },
   { x: 9250, y: 380, w: 145, h: 18 },
-  { x: 9600, y: 300, w: 150, h: 18 },
-  { x: 9920, y: 385, w: 145, h: 18 },
-  { x: 10250, y: 320, w: 155, h: 18 },
-  { x: 10600, y: 390, w: 145, h: 18 },
+  { x: 9600, y: 315, w: 150, h: 18 },
+  { x: 9920, y: 400, w: 145, h: 18 },
+  { x: 10200, y: 325, w: 155, h: 18 },
+  { x: 10600, y: 400, w: 145, h: 18 },
 
   // expanded sleeping coast: astral breakwater
   { x: 8700, y: 1190, w: 650, h: 190 },
@@ -455,15 +463,15 @@ const platforms = [
   { x: 10170, y: 1190, w: 680, h: 190 },
   { x: 10950, y: 1190, w: 650, h: 190 },
   { x: 11700, y: 1190, w: 700, h: 190 },
-  { x: 8840, y: 1080, w: 145, h: 18 },
-  { x: 9120, y: 1000, w: 150, h: 18 },
-  { x: 9500, y: 1070, w: 145, h: 18 },
-  { x: 9820, y: 990, w: 155, h: 18 },
-  { x: 10200, y: 1075, w: 145, h: 18 },
-  { x: 10520, y: 995, w: 150, h: 18 },
-  { x: 10950, y: 1070, w: 145, h: 18 },
-  { x: 11300, y: 990, w: 155, h: 18 },
-  { x: 11720, y: 1070, w: 150, h: 18 }
+  { x: 8840, y: 1110, w: 145, h: 18 },
+  { x: 9120, y: 1030, w: 150, h: 18 },
+  { x: 9500, y: 1110, w: 145, h: 18 },
+  { x: 9770, y: 1030, w: 155, h: 18 },
+  { x: 10200, y: 1110, w: 145, h: 18 },
+  { x: 10470, y: 1030, w: 150, h: 18 },
+  { x: 10950, y: 1110, w: 145, h: 18 },
+  { x: 11220, y: 1030, w: 155, h: 18 },
+  { x: 11720, y: 1110, w: 150, h: 18 }
 ];
 
 const movingPlatforms = [
@@ -479,7 +487,7 @@ const movingPlatforms = [
   ,{ x: 6150, y: -1190, w: 96, h: 16, baseX: 6150, baseY: -1190, axis: "y", range: 70, speed: 1.05, phase: 2.7, dx: 0, dy: 0, moving: true }
   ,{ x: 2230, y: 850, w: 92, h: 16, baseX: 2230, baseY: 850, axis: "x", range: 78, speed: .9, phase: .4, dx: 0, dy: 0, moving: true }
   ,{ x: 4700, y: 1910, w: 98, h: 16, baseX: 4700, baseY: 1910, axis: "y", range: 72, speed: .75, phase: 3.2, dx: 0, dy: 0, moving: true }
-  ,{ x: 5000, y: 1890, w: 105, h: 16, baseX: 5000, baseY: 1890, axis: "y", range: 150, speed: .58, phase: 1.57, dx: 0, dy: 0, moving: true }
+  ,{ x: 5000, y: 1890, w: 105, h: 16, baseX: 5000, baseY: 1890, axis: "y", range: 150, speed: .58, phase: 1.57, dx: 0, dy: 0, moving: true, oneWay: true }
   ,{ x: 9420, y: 350, w: 98, h: 16, baseX: 9420, baseY: 350, axis: "y", range: 62, speed: 1.2, phase: 1.8, dx: 0, dy: 0, moving: true }
   ,{ x: 10780, y: 1030, w: 98, h: 16, baseX: 10780, baseY: 1030, axis: "x", range: 85, speed: .8, phase: 2.1, dx: 0, dy: 0, moving: true }
 ];
@@ -487,13 +495,13 @@ const movingPlatforms = [
 const crumblePlatforms = [
   { x: 520, y: 360, w: 82, h: 15, timer: 0, gone: 0, crumble: true },
   { x: 1450, y: 380, w: 76, h: 15, timer: 0, gone: 0, crumble: true },
-  { x: 2290, y: 330, w: 84, h: 15, timer: 0, gone: 0, crumble: true },
+  { x: 2290, y: 340, w: 84, h: 15, timer: 0, gone: 0, crumble: true },
   { x: 2860, y: 417, w: 72, h: 15, timer: 0, gone: 0, crumble: true },
   { x: 4025, y: 320, w: 88, h: 15, timer: 0, gone: 0, crumble: true },
   { x: 5660, y: 410, w: 90, h: 15, timer: 0, gone: 0, crumble: true }
   ,{ x: 3470, y: -820, w: 82, h: 15, timer: 0, gone: 0, crumble: true }
   ,{ x: 2200, y: 925, w: 82, h: 15, timer: 0, gone: 0, crumble: true }
-  ,{ x: 5600, y: 1885, w: 86, h: 15, timer: 0, gone: 0, crumble: true }
+  ,{ x: 5600, y: 1970, w: 86, h: 15, timer: 0, gone: 0, crumble: true }
   ,{ x: 8580, y: 410, w: 88, h: 15, timer: 0, gone: 0, crumble: true }
   ,{ x: 9350, y: 1120, w: 88, h: 15, timer: 0, gone: 0, crumble: true }
   ,{ x: 10850, y: 1120, w: 90, h: 15, timer: 0, gone: 0, crumble: true }
@@ -524,7 +532,7 @@ const checkpointData = [
   { x: 115, y: 421 }, { x: 1690, y: 341 }, { x: 3150, y: 431 }, { x: 5350, y: 421 },
   { x: 4010, y: -845 }, { x: 4410, y: -1060 }, { x: 4080, y: 1190 },
   { x: 6360, y: 475 }, { x: 7480, y: 475 }, { x: 7810, y: 1190 }, { x: 5580, y: 1190 }
-  ,{ x: 2050, y: -840 }, { x: 6100, y: -1060 }, { x: 5550, y: -300 }
+  ,{ x: 2050, y: -840 }, { x: 6100, y: -1060 }, { x: 5550, y: -275 }
   ,{ x: 760, y: 960 }, { x: 4200, y: 2050 }, { x: 6400, y: 2050 }
   ,{ x: 8900, y: 475 }, { x: 10400, y: 475 }, { x: 9200, y: 1190 }, { x: 11100, y: 1190 }
 ];
@@ -542,8 +550,8 @@ const landmarks = [
   { id: "canopy_nest", region: "빛의 수관", name: "빈 나방 둥지", text: "수관의 나방들은 멈춘 시계 쪽으로 모두 날아갔다.", x: 3020, y: -840 },
   { id: "clock_orrery", region: "달빛 시계탑", name: "고장 난 천구의", text: "별의 궤도는 멈췄지만 톱니는 아직 다음 밤을 계산한다.", x: 5520, y: -1060 },
   { id: "clock_hour", region: "달빛 시계탑", name: "열세 번째 시각", text: "존재하지 않는 시각에만 종루로 향하는 문이 열린다.", x: 6460, y: -1060 },
-  { id: "bell_choir", region: "종루", name: "공명의 성가대", text: "목소리를 잃은 순례자들이 종 대신 벽을 울렸다.", x: 5400, y: -300 },
-  { id: "bell_clapper", region: "종루", name: "검은 추", text: "심연의 종지기는 마지막 울림을 자신의 심장에 묶었다.", x: 6010, y: -300 },
+  { id: "bell_choir", region: "종루", name: "공명의 성가대", text: "목소리를 잃은 순례자들이 종 대신 벽을 울렸다.", x: 5400, y: -275 },
+  { id: "bell_clapper", region: "종루", name: "검은 추", text: "심연의 종지기는 마지막 울림을 자신의 심장에 묶었다.", x: 6010, y: -275 },
   { id: "forge_mold", region: "잿빛 제련소", name: "왕관의 거푸집", text: "이곳에서는 왕의 왕관보다 문의 열쇠를 더 많이 만들었다.", x: 8420, y: 475 },
   { id: "forge_furnace", region: "잿빛 제련소", name: "꺼지지 않는 용광로", text: "재 속의 불씨는 주인이 돌아오기를 천 년째 기다린다.", x: 9800, y: 475 },
   { id: "coast_beacon", region: "별잠 해안", name: "별빛 봉화", text: "바다는 매일 밤 하늘에서 떨어진 별을 이곳으로 밀어낸다.", x: 9050, y: 1190 },
@@ -558,7 +566,7 @@ const eliteDefs = [
   { id: "canopyHunter", region: "canopy", name: "녹광 사냥꾼", x: 2050, groundY: -840, bounds: [1810, 2500], color: "#b6f59d", hp: 12 },
   { id: "rootMaw", region: "roots", name: "공허뿌리 아귀", x: 900, groundY: 960, bounds: [540, 1180], color: "#b984d8", hp: 13 },
   { id: "clockKnight", region: "clock", name: "황동 초침기사", x: 5900, groundY: -1060, bounds: [5300, 6180], color: "#f1d16f", hp: 14 },
-  { id: "bellCantor", region: "bell", name: "무언의 종지휘자", x: 5700, groundY: -300, bounds: [5230, 6160], color: "#c4a2ff", hp: 15 },
+  { id: "bellCantor", region: "bell", name: "무언의 종지휘자", x: 5700, groundY: -275, bounds: [5230, 6160], color: "#c4a2ff", hp: 15 },
   { id: "archiveBinder", region: "archive", name: "심층 제본사", x: 5250, groundY: 2050, bounds: [4800, 5570], color: "#68ded0", hp: 15 },
   { id: "forgeGolem", region: "forge", name: "쇳물 골렘", x: 9000, groundY: 475, bounds: [8700, 9380], color: "#ff8652", hp: 16 },
   { id: "coastSiren", region: "coast", name: "푸른별 세이렌", x: 10280, groundY: 1190, bounds: [10190, 10820], color: "#82d9ff", hp: 16 }
@@ -582,7 +590,7 @@ const enemySeeds = [
   [6860, 1035, "starling", true], [8000, 1040, "starling", true],
   [2180, -925, "flyer", true], [2780, -930, "flyer", true], [3200, -875, "crawler", true],
   [5480, -1140, "clockwork", true], [6030, -1210, "clockwork", true], [6500, -1140, "clockwork", true],
-  [5450, -350, "clockwork", true], [5950, -365, "crawler", true],
+  [5450, -325, "clockwork", true], [5950, -307, "crawler", true],
   [700, 900, "crawler", true], [1450, 900, "flyer", true], [2050, 900, "crawler", true],
   [3400, 1900, "inkling", true], [4100, 1870, "inkling", true], [4850, 1900, "inkling", true], [6100, 1870, "inkling", true],
   [8150, 410, "emberling", true], [8750, 410, "emberling", true], [9300, 410, "emberling", true],
@@ -1416,6 +1424,7 @@ function moveAndCollide(dt) {
     solids.push({ x: 5880, y: 960, w: 40, h: 230, gate: "forgeShortcut" });
   }
   for (const p of solids) {
+    if (p.oneWay) continue;
     if (!overlap(player, p)) continue;
     if (player.vx > 0) player.x = p.x - player.w;
     else if (player.vx < 0) player.x = p.x + p.w;
@@ -1434,6 +1443,7 @@ function moveAndCollide(dt) {
     ? a.y - b.y
     : (b.y + b.h) - (a.y + a.h));
   for (const p of verticalSolids) {
+    if (p.oneWay && player.vy < 0) continue;
     const horizontallyOverlapping = player.x < p.x + p.w && player.x + player.w > p.x;
     const crossedTop = player.vy > 0
       && previousY + player.h <= p.y
