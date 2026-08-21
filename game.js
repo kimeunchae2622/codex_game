@@ -18,6 +18,13 @@ const sigilSlotCountEl = document.querySelector("#sigilSlotCount");
 const sigilSlotPipsEl = document.querySelector("#sigilSlotPips");
 const sigilOwnedCountEl = document.querySelector("#sigilOwnedCount");
 const inventoryMessageEl = document.querySelector("#inventoryMessage");
+const settingsScreen = document.querySelector("#settingsScreen");
+const musicVolumeInput = document.querySelector("#musicVolume");
+const sfxVolumeInput = document.querySelector("#sfxVolume");
+const musicVolumeValueEl = document.querySelector("#musicVolumeValue");
+const sfxVolumeValueEl = document.querySelector("#sfxVolumeValue");
+const screenShakeInput = document.querySelector("#screenShake");
+const pixelEffectInput = document.querySelector("#pixelEffect");
 const toastEl = document.querySelector("#toast");
 const W = canvas.width;
 const H = canvas.height;
@@ -32,6 +39,9 @@ let running = false;
 let paused = false;
 let shopOpen = false;
 let inventoryOpen = false;
+let settingsOpen = false;
+let settingsResumeGame = false;
+let settingsOpenedFromPause = false;
 let shopSelection = 0;
 let inventorySelection = 0;
 let activeVendor = null;
@@ -41,9 +51,25 @@ let last = 0;
 let time = 0;
 let shake = 0;
 let toastTimer = 0;
-let soundOn = true;
+const settingsDefault = {
+  soundOn: true, musicVolume: .9, sfxVolume: .75,
+  screenShake: true, pixelEffect: true
+};
+function loadSettings() {
+  try {
+    const loaded = { ...settingsDefault, ...JSON.parse(localStorage.getItem("jjapronightSettings") || "{}") };
+    loaded.musicVolume = Math.max(0, Math.min(1, Number(loaded.musicVolume) || 0));
+    loaded.sfxVolume = Math.max(0, Math.min(1, Number(loaded.sfxVolume) || 0));
+    return loaded;
+  } catch {
+    return { ...settingsDefault };
+  }
+}
+const gameSettings = loadSettings();
+let soundOn = gameSettings.soundOn;
 let audio;
 let musicMaster;
+let sfxMaster;
 let currentMusicTrack = "";
 let musicStep = 0;
 let musicNextNote = 0;
@@ -116,16 +142,16 @@ const sigilCatalog = {
 
 const equipmentCatalog = {
   weapon: { cost: 8, name: "새벽의 칼날", description: "기본 공격력 +1", type: "equipment" },
-  armor: { cost: 10, name: "이끼 갑옷", description: "기본 최대 체력 +1", type: "equipment" },
-  doubleJump: { cost: 12, name: "나방의 날개", description: "공중 점프 +1", type: "equipment" },
-  bellKey: { cost: 6, name: "종루의 열쇠", description: "심연의 종지기 관문을 여는 열쇠", type: "equipment" }
+  armor: { cost: 12, name: "이끼 갑옷", description: "기본 최대 체력 +1", type: "equipment" },
+  doubleJump: { cost: 15, name: "나방의 날개", description: "공중 점프 +1", type: "equipment" },
+  bellKey: { cost: 10, name: "종루의 열쇠", description: "심연의 종지기 관문을 여는 열쇠", type: "equipment" }
 };
 
 const gardenSigils = ["tideSigil", "thornMark", "mossHeart", "swiftRoot", "sharpPetal", "coinBloom", "quietStep", "longNeedle", "secondWind"];
 const clockSigils = ["brassWing", "cometDash", "hourglass", "orbitBlade", "starNeedle", "clockShield", "lunarStep", "echoDash", "gearHeart"];
 const archiveSigils = ["archiveEye", "inkHeart", "deepCurrent", "collector", "floodedWing", "memoryEdge", "bubbleGuard", "drownedLuck", "abyssStep"];
 const sigilCosts = {
-  tideSigil: 6, thornMark: 7, mossHeart: 9, swiftRoot: 6, sharpPetal: 11, coinBloom: 5, quietStep: 6, longNeedle: 10, secondWind: 13,
+  tideSigil: 6, thornMark: 8, mossHeart: 11, swiftRoot: 7, sharpPetal: 14, coinBloom: 5, quietStep: 6, longNeedle: 12, secondWind: 18,
   brassWing: 9, cometDash: 10, hourglass: 7, orbitBlade: 15, starNeedle: 11, clockShield: 12, lunarStep: 8, echoDash: 11, gearHeart: 16,
   archiveEye: 7, inkHeart: 10, deepCurrent: 8, collector: 11, floodedWing: 12, memoryEdge: 16, bubbleGuard: 12, drownedLuck: 7, abyssStep: 11
 };
@@ -220,7 +246,7 @@ const vendors = [
   }
 ];
 const slotProducts = {
-  gardenSlot: { type: "slot", name: "새 인장 홈", description: "인장 슬롯 +1", cost: 12 },
+  gardenSlot: { type: "slot", name: "새 인장 홈", description: "인장 슬롯 +1", cost: 16 },
   clockSlot: { type: "slot", name: "황동 인장 홈", description: "인장 슬롯 +1", cost: 18 },
   archiveSlot: { type: "slot", name: "기록 인장 홈", description: "인장 슬롯 +1", cost: 22 }
 };
@@ -726,8 +752,32 @@ function ensureAudio() {
     musicMaster.gain.value = .0001;
     musicMaster.connect(audio.destination);
   }
+  if (!sfxMaster) {
+    sfxMaster = audio.createGain();
+    sfxMaster.gain.value = gameSettings.sfxVolume;
+    sfxMaster.connect(audio.destination);
+  }
   if (audio.state === "suspended") audio.resume();
   return audio;
+}
+
+function storeSettings() {
+  localStorage.setItem("jjapronightSettings", JSON.stringify(gameSettings));
+}
+
+function musicGain() {
+  return Math.max(.0001, gameSettings.musicVolume * 1.5);
+}
+
+function applyAudioSettings() {
+  if (!audio) return;
+  const now = audio.currentTime;
+  if (sfxMaster) sfxMaster.gain.setTargetAtTime(soundOn ? gameSettings.sfxVolume : 0, now, .025);
+  if (musicMaster) {
+    const target = soundOn && currentMusicTrack ? musicGain() : .0001;
+    musicMaster.gain.cancelScheduledValues(now);
+    musicMaster.gain.setTargetAtTime(target, now, .04);
+  }
 }
 
 function midiFrequency(note) {
@@ -805,7 +855,7 @@ function switchMusicTrack(trackId) {
   const now = audio.currentTime;
   musicMaster.gain.cancelScheduledValues(now);
   musicMaster.gain.setValueAtTime(Math.max(.0001, musicMaster.gain.value), now);
-  musicMaster.gain.exponentialRampToValueAtTime(trackId ? .55 : .0001, now + .16);
+  musicMaster.gain.exponentialRampToValueAtTime(trackId && soundOn ? musicGain() : .0001, now + .16);
   musicNextNote = now + .18;
 }
 
@@ -848,7 +898,7 @@ function beep(freq = 300, duration = .08, type = "sine", volume = .05) {
   o.type = type; o.frequency.setValueAtTime(freq, audio.currentTime);
   g.gain.setValueAtTime(volume, audio.currentTime);
   g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + duration);
-  o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + duration);
+  o.connect(g).connect(sfxMaster); o.start(); o.stop(audio.currentTime + duration);
 }
 
 function toast(text, duration = 2200) {
@@ -899,9 +949,44 @@ function isProductOwned(id) {
   return save.ownedSigils.includes(id);
 }
 
+function getGardenStock() {
+  const tiers = [
+    ["weapon", "tideSigil", "swiftRoot", "coinBloom"],
+    ["armor", "thornMark", "quietStep"],
+    ["doubleJump", "mossHeart", "longNeedle"],
+    ["sharpPetal", "secondWind", "gardenSlot"],
+    ["bellKey"]
+  ];
+  let stage = 0;
+  if (save.dash) stage = 1;
+  if (save.echoes.length >= 2) stage = 2;
+  if (save.echoes.length >= 3) stage = 3;
+  if (save.midBossDefeated) stage = 4;
+  const stageNames = ["새싹 진열대", "방랑자 진열대", "메아리 진열대", "정원사 진열대", "종루 원정대"];
+  const nextConditions = [
+    "그림자 대시를 발견하면 새 상품이 들어옵니다.",
+    "메아리 조각을 2개 모으면 새 상품이 들어옵니다.",
+    "메아리 조각을 모두 모으면 새 상품이 들어옵니다.",
+    "청록 수문장을 쓰러뜨리면 마지막 상품이 들어옵니다.",
+    "모든 정원 상품이 입고되었습니다."
+  ];
+  return {
+    stage,
+    name: stageNames[stage],
+    products: tiers.slice(0, stage + 1).flat(),
+    message: nextConditions[stage]
+  };
+}
+
+function getVendorStock(vendor) {
+  return vendor.id === "garden"
+    ? getGardenStock()
+    : { stage: 0, name: "지역 진열대", products: vendor.products, message: "이 지역의 인장과 슬롯 확장을 판매합니다." };
+}
+
 function renderShopProducts() {
   shopGridEl.replaceChildren();
-  activeVendor.products.forEach(id => {
+  getVendorStock(activeVendor).products.forEach(id => {
     const product = getProduct(id);
     const button = document.createElement("button");
     button.type = "button";
@@ -916,14 +1001,15 @@ function renderShopProducts() {
 function openShop(vendor) {
   activeVendor = vendor;
   shopOpen = true;
+  const stock = getVendorStock(vendor);
   shopKickerEl.textContent = vendor.kicker;
-  shopTitleEl.textContent = vendor.name;
+  shopTitleEl.textContent = vendor.id === "garden" ? `${vendor.name} · ${stock.name}` : vendor.name;
   renderShopProducts();
   const firstAvailable = shopButtons.findIndex(button => !isProductOwned(button.dataset.productId));
   shopSelection = firstAvailable >= 0 ? firstAvailable : 0;
   keys.clear();
   taps.clear();
-  updateShopUI("방향키로 품목 선택 · Z 구매 · A 나가기");
+  updateShopUI(`${stock.message} · 방향키 선택 · Z 구매 · A 나가기`);
   shopScreen.classList.remove("hidden");
 }
 
@@ -1091,7 +1177,64 @@ function moveInventorySelection(code) {
   beep(380 + inventorySelection * 12, .035, "sine", .015);
 }
 
+function syncSettingsUI() {
+  const musicPercent = Math.round(gameSettings.musicVolume * 100);
+  const sfxPercent = Math.round(gameSettings.sfxVolume * 100);
+  musicVolumeInput.value = String(musicPercent);
+  sfxVolumeInput.value = String(sfxPercent);
+  musicVolumeValueEl.textContent = `${musicPercent}%`;
+  sfxVolumeValueEl.textContent = `${sfxPercent}%`;
+  screenShakeInput.checked = gameSettings.screenShake;
+  pixelEffectInput.checked = gameSettings.pixelEffect;
+  const soundButton = document.querySelector("#soundButton");
+  soundButton.textContent = soundOn ? "음악·효과음 끄기" : "음악·효과음 켜기";
+  soundButton.setAttribute("aria-pressed", String(soundOn));
+}
+
+function openSettings() {
+  if (settingsOpen) return;
+  settingsOpen = true;
+  settingsResumeGame = running && !paused;
+  settingsOpenedFromPause = running && paused;
+  if (settingsOpenedFromPause) pauseScreen.classList.add("hidden");
+  if (settingsResumeGame) {
+    paused = true;
+    loopGeneration++;
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = 0;
+    updateMusic();
+  }
+  keys.clear();
+  taps.clear();
+  syncSettingsUI();
+  settingsScreen.classList.remove("hidden");
+  musicVolumeInput.focus();
+}
+
+function closeSettings() {
+  if (!settingsOpen) return;
+  settingsOpen = false;
+  settingsScreen.classList.add("hidden");
+  keys.clear();
+  taps.clear();
+  if (settingsOpenedFromPause) pauseScreen.classList.remove("hidden");
+  if (settingsResumeGame) {
+    paused = false;
+    updateMusic(true);
+    startGameLoop();
+  }
+  settingsResumeGame = false;
+  settingsOpenedFromPause = false;
+}
+
 addEventListener("keydown", e => {
+  if (settingsOpen) {
+    if (e.code === "Escape" || e.code === "KeyA") {
+      e.preventDefault();
+      closeSettings();
+    }
+    return;
+  }
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyA", "KeyI", "Escape"].includes(e.code)) e.preventDefault();
   if (shopOpen) {
     if (e.code === "KeyA") closeShop();
@@ -1139,6 +1282,30 @@ document.querySelector("#startButton").addEventListener("click", () => {
   startGameLoop();
 });
 document.querySelector("#resumeButton").addEventListener("click", togglePause);
+document.querySelector("#settingsButton").addEventListener("click", openSettings);
+document.querySelector("#pauseSettingsButton").addEventListener("click", openSettings);
+document.querySelector("#closeSettingsButton").addEventListener("click", closeSettings);
+musicVolumeInput.addEventListener("input", e => {
+  gameSettings.musicVolume = Number(e.currentTarget.value) / 100;
+  musicVolumeValueEl.textContent = `${e.currentTarget.value}%`;
+  storeSettings();
+  applyAudioSettings();
+});
+sfxVolumeInput.addEventListener("input", e => {
+  gameSettings.sfxVolume = Number(e.currentTarget.value) / 100;
+  sfxVolumeValueEl.textContent = `${e.currentTarget.value}%`;
+  storeSettings();
+  applyAudioSettings();
+});
+screenShakeInput.addEventListener("change", e => {
+  gameSettings.screenShake = e.currentTarget.checked;
+  storeSettings();
+});
+pixelEffectInput.addEventListener("change", e => {
+  gameSettings.pixelEffect = e.currentTarget.checked;
+  storeSettings();
+  render();
+});
 document.querySelectorAll("[data-reset-game]").forEach(button => {
   button.addEventListener("click", () => {
     const confirmed = confirm("체크포인트, 코인, 능력, 수집품과 상점 구매를 모두 지우고 처음부터 시작할까요?");
@@ -1149,16 +1316,19 @@ document.querySelectorAll("[data-reset-game]").forEach(button => {
 });
 document.querySelector("#soundButton").addEventListener("click", e => {
   soundOn = !soundOn;
-  e.currentTarget.textContent = soundOn ? "음악·효과음 끄기" : "음악·효과음 켜기";
-  e.currentTarget.setAttribute("aria-pressed", String(soundOn));
+  gameSettings.soundOn = soundOn;
+  storeSettings();
+  syncSettingsUI();
   if (soundOn) {
     ensureAudio();
     beep(520, .1, "sine", .06);
     updateMusic(true);
   } else {
     switchMusicTrack("");
+    applyAudioSettings();
   }
 });
+syncSettingsUI();
 
 function findSupportingPlatform(tolerance = 7) {
   const playerFeet = player.y + player.h;
@@ -3631,13 +3801,13 @@ function drawPixelFinish() {
 
 function render() {
   ctx.save();
-  if (shake > .2) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
+  if (gameSettings.screenShake && shake > .2) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
   drawBackground(); drawWorld(); drawScreenAtmosphere(); drawHUD();
   if (player.respawning > 0) {
     ctx.fillStyle = `rgba(2,4,9,${clamp(player.respawning, 0, .75)})`; ctx.fillRect(0, 0, W, H);
   }
   ctx.restore();
-  drawPixelFinish();
+  if (gameSettings.pixelEffect) drawPixelFinish();
 }
 
 function win() {
