@@ -52,7 +52,7 @@ let time = 0;
 let shake = 0;
 let toastTimer = 0;
 const settingsDefault = {
-  soundOn: true, musicVolume: .9, sfxVolume: .75,
+  soundOn: true, musicVolume: .95, sfxVolume: .75,
   screenShake: true, pixelEffect: true
 };
 function loadSettings() {
@@ -135,16 +135,16 @@ const sigilCatalog = {
   drownedLuck: { name: "침수된 행운", slots: 1, color: "#e0bf63", glyph: "✧", description: "코인 추가 획득 확률이 높아집니다.", effects: { coinBonus: 1 } },
   abyssStep: { name: "심연 걸음", slots: 2, color: "#7699d8", glyph: "≋", description: "이동과 대시 속도가 증가합니다.", effects: { move: .1, dashSpeed: .1 } },
 
-  moonGear: { name: "월륜 톱니", slots: 2, color: "#f4d567", glyph: "☼", description: "대시 재사용 시간이 28% 감소합니다.", effects: { dashCooldown: .28 }, boss: true },
-  archiveCrown: { name: "기록고의 왕관", slots: 2, color: "#62e3d2", glyph: "♛", description: "코인 흡수 범위와 최대 체력이 증가합니다.", effects: { magnet: 260, maxHp: 1 }, boss: true },
-  wardenPulse: { name: "수문장의 맥동", slots: 3, color: "#86eadc", glyph: "✺", description: "공격력과 최대 체력이 1 증가합니다.", effects: { attack: 1, maxHp: 1 }, boss: true }
+  moonGear: { name: "월륜 균환", slots: 2, color: "#f4d567", glyph: "☼", description: "대시 재사용 시간이 28% 감소합니다.", effects: { dashCooldown: .28 }, boss: true },
+  archiveCrown: { name: "균문고의 포자관", slots: 2, color: "#62e3d2", glyph: "♛", description: "코인 흡수 범위와 최대 체력이 증가합니다.", effects: { magnet: 260, maxHp: 1 }, boss: true },
+  wardenPulse: { name: "균사수문의 맥동", slots: 3, color: "#86eadc", glyph: "✺", description: "공격력과 최대 체력이 1 증가합니다.", effects: { attack: 1, maxHp: 1 }, boss: true }
 };
 
 const equipmentCatalog = {
-  weapon: { cost: 8, name: "새벽의 칼날", description: "기본 공격력 +1", type: "equipment" },
-  armor: { cost: 12, name: "이끼 갑옷", description: "기본 최대 체력 +1", type: "equipment" },
-  doubleJump: { cost: 15, name: "나방의 날개", description: "공중 점프 +1", type: "equipment" },
-  bellKey: { cost: 10, name: "종루의 열쇠", description: "심연의 종지기 관문을 여는 열쇠", type: "equipment" }
+  weapon: { cost: 8, name: "균사 침", description: "기본 공격력 +1", type: "equipment" },
+  armor: { cost: 12, name: "균피 갑옷", description: "기본 최대 체력 +1", type: "equipment" },
+  doubleJump: { cost: 15, name: "포자막", description: "공중 점프 +1", type: "equipment" },
+  bellKey: { cost: 10, name: "균종루의 열쇠", description: "심연 균종지기 관문을 여는 열쇠", type: "equipment" }
 };
 
 const gardenSigils = ["tideSigil", "thornMark", "mossHeart", "swiftRoot", "sharpPetal", "coinBloom", "quietStep", "longNeedle", "secondWind"];
@@ -231,17 +231,17 @@ const bossProjectiles = [];
 const vendors = [
   {
     id: "garden", x: 1810, y: FLOOR - 47, w: 34, h: 47,
-    name: "방랑자의 상점", kicker: "뿌리 상인의 작업대", color: "#ffe3a2",
+    name: "균사 방랑자의 상점", kicker: "포자 상인의 배양대", color: "#ffe3a2",
     products: ["weapon", "armor", "doubleJump", "bellKey", ...gardenSigils, "gardenSlot"]
   },
   {
     id: "clock", x: 4485, y: -1107, w: 34, h: 47,
-    name: "황동 천문 상점", kicker: "달빛 시계공의 진열대", color: "#f4d477",
+    name: "월광 균륜 상점", kicker: "포자 시계공의 진열대", color: "#f4d477",
     products: [...clockSigils, "clockSlot"]
   },
   {
     id: "archive", x: 4190, y: 1143, w: 34, h: 47,
-    name: "잠긴 기록 상점", kicker: "침수된 서기관의 장서", color: "#6be0d2",
+    name: "잠긴 균문 상점", kicker: "침수된 균문사의 배양서", color: "#6be0d2",
     products: [...archiveSigils, "archiveSlot"]
   }
 ];
@@ -544,32 +544,32 @@ const echoes = [
 ];
 
 const landmarks = [
-  { id: "garden_seed", region: "정원", name: "첫 정원사의 비석", text: "종이 울리기 전, 모든 길은 한 송이 꽃에서 시작되었다.", x: 760, y: 420 },
-  { id: "garden_bell", region: "정원", name: "금이 간 작은 종", text: "누군가 거대한 종의 울림을 이 작은 종들에 나누어 숨겼다.", x: 3500, y: 355 },
-  { id: "canopy_leaf", region: "빛의 수관", name: "황혼 잎맥", text: "가장 높은 잎은 달의 시간을 먹고 은빛으로 자란다.", x: 2240, y: -840 },
-  { id: "canopy_nest", region: "빛의 수관", name: "빈 나방 둥지", text: "수관의 나방들은 멈춘 시계 쪽으로 모두 날아갔다.", x: 3020, y: -840 },
-  { id: "clock_orrery", region: "달빛 시계탑", name: "고장 난 천구의", text: "별의 궤도는 멈췄지만 톱니는 아직 다음 밤을 계산한다.", x: 5520, y: -1060 },
-  { id: "clock_hour", region: "달빛 시계탑", name: "열세 번째 시각", text: "존재하지 않는 시각에만 종루로 향하는 문이 열린다.", x: 6460, y: -1060 },
-  { id: "bell_choir", region: "종루", name: "공명의 성가대", text: "목소리를 잃은 순례자들이 종 대신 벽을 울렸다.", x: 5400, y: -275 },
-  { id: "bell_clapper", region: "종루", name: "검은 추", text: "심연의 종지기는 마지막 울림을 자신의 심장에 묶었다.", x: 6010, y: -275 },
-  { id: "forge_mold", region: "잿빛 제련소", name: "왕관의 거푸집", text: "이곳에서는 왕의 왕관보다 문의 열쇠를 더 많이 만들었다.", x: 8420, y: 475 },
-  { id: "forge_furnace", region: "잿빛 제련소", name: "꺼지지 않는 용광로", text: "재 속의 불씨는 주인이 돌아오기를 천 년째 기다린다.", x: 9800, y: 475 },
-  { id: "coast_beacon", region: "별잠 해안", name: "별빛 봉화", text: "바다는 매일 밤 하늘에서 떨어진 별을 이곳으로 밀어낸다.", x: 9050, y: 1190 },
-  { id: "coast_wreck", region: "별잠 해안", name: "잠든 순례선", text: "배는 기록고를 향했지만 선원들은 별의 꿈에서 깨어나지 못했다.", x: 10800, y: 1190 },
-  { id: "archive_index", region: "침수된 기록고", name: "무한 색인", text: "물에 지워진 이름도 색인에는 빈 줄로 남아 있다.", x: 4300, y: 2050 },
-  { id: "archive_vault", region: "침수된 기록고", name: "봉인 장서", text: "정원의 진짜 이름은 가장 깊은 서고에 거꾸로 기록되었다.", x: 6100, y: 2050 },
-  { id: "roots_heart", region: "가라앉은 뿌리", name: "뿌리의 심장", text: "정원이 잊은 모든 기억은 아래로 흘러 뿌리의 먹이가 된다.", x: 850, y: 960 },
-  { id: "roots_well", region: "가라앉은 뿌리", name: "메아리 우물", text: "우물에 이름을 말하면 오래전의 목소리가 대신 대답한다.", x: 1800, y: 960 }
+  { id: "garden_seed", region: "포자 정원", name: "첫 균사의 비석", text: "종이 울리기 전, 모든 길은 하나의 포자에서 갈라졌다.", x: 760, y: 420 },
+  { id: "garden_bell", region: "포자 정원", name: "금이 간 포자종", text: "오래된 균사망은 이 작은 종들의 진동으로 서로를 기억한다.", x: 3500, y: 355 },
+  { id: "canopy_leaf", region: "발광 균관", name: "황혼 균사맥", text: "가장 높은 균사는 달빛을 먹고 은빛 포자를 뿌린다.", x: 2240, y: -840 },
+  { id: "canopy_nest", region: "발광 균관", name: "빈 포자낭", text: "한때 이곳을 채운 포자는 멈춘 포자탑으로 모두 흘러갔다.", x: 3020, y: -840 },
+  { id: "clock_orrery", region: "월광 포자탑", name: "고장 난 균륜의", text: "포자 고리는 멈췄지만 다음 밤의 발아를 아직 계산한다.", x: 5520, y: -1060 },
+  { id: "clock_hour", region: "월광 포자탑", name: "열세 번째 발아", text: "존재하지 않는 시각에만 균사 종루로 향하는 문이 열린다.", x: 6460, y: -1060 },
+  { id: "bell_choir", region: "균사 종루", name: "공명의 균사합창", text: "말라붙은 균사들이 종 대신 벽을 울려 신호를 보냈다.", x: 5400, y: -275 },
+  { id: "bell_clapper", region: "균사 종루", name: "검은 균핵추", text: "심연 균종지기는 마지막 울림을 자신의 균핵에 묶었다.", x: 6010, y: -275 },
+  { id: "forge_mold", region: "잿빛 배양로", name: "왕관곰팡이의 틀", text: "열을 먹는 곰팡이가 금속 대신 살아 있는 갑각을 길러 냈다.", x: 8420, y: 475 },
+  { id: "forge_furnace", region: "잿빛 배양로", name: "꺼지지 않는 배양심", text: "재 속의 열균은 주인이 돌아오기를 천 년째 기다린다.", x: 9800, y: 475 },
+  { id: "coast_beacon", region: "별포자 습지", name: "별포자 봉화", text: "물결은 매일 밤 하늘에서 떨어진 포자를 이곳으로 밀어낸다.", x: 9050, y: 1190 },
+  { id: "coast_wreck", region: "별포자 습지", name: "잠든 균사선", text: "배는 균문고를 향했지만 선원들은 별포자의 꿈에서 깨어나지 못했다.", x: 10800, y: 1190 },
+  { id: "archive_index", region: "침수 균문고", name: "무한 균사 색인", text: "물에 지워진 이름도 균사망에는 희미한 진동으로 남아 있다.", x: 4300, y: 2050 },
+  { id: "archive_vault", region: "침수 균문고", name: "봉인 배양서", text: "왕국의 첫 포자는 가장 깊은 균문고에 거꾸로 기록되었다.", x: 6100, y: 2050 },
+  { id: "roots_heart", region: "가라앉은 균근", name: "균근의 심장", text: "위에서 잊힌 모든 기억은 아래로 흘러 균사망의 먹이가 된다.", x: 850, y: 960 },
+  { id: "roots_well", region: "가라앉은 균근", name: "포자 메아리 우물", text: "우물에 이름을 말하면 오래전 균사망의 목소리가 대신 대답한다.", x: 1800, y: 960 }
 ];
 
 const eliteDefs = [
-  { id: "canopyHunter", region: "canopy", name: "녹광 사냥꾼", x: 2050, groundY: -840, bounds: [1810, 2500], color: "#b6f59d", hp: 12 },
-  { id: "rootMaw", region: "roots", name: "공허뿌리 아귀", x: 900, groundY: 960, bounds: [540, 1180], color: "#b984d8", hp: 13 },
-  { id: "clockKnight", region: "clock", name: "황동 초침기사", x: 5900, groundY: -1060, bounds: [5300, 6180], color: "#f1d16f", hp: 14 },
-  { id: "bellCantor", region: "bell", name: "무언의 종지휘자", x: 5700, groundY: -275, bounds: [5230, 6160], color: "#c4a2ff", hp: 15 },
-  { id: "archiveBinder", region: "archive", name: "심층 제본사", x: 5250, groundY: 2050, bounds: [4800, 5570], color: "#68ded0", hp: 15 },
-  { id: "forgeGolem", region: "forge", name: "쇳물 골렘", x: 9000, groundY: 475, bounds: [8700, 9380], color: "#ff8652", hp: 16 },
-  { id: "coastSiren", region: "coast", name: "푸른별 세이렌", x: 10280, groundY: 1190, bounds: [10190, 10820], color: "#82d9ff", hp: 16 }
+  { id: "canopyHunter", region: "canopy", name: "녹광 포자사냥꾼", x: 2050, groundY: -840, bounds: [1810, 2500], color: "#b6f59d", hp: 12 },
+  { id: "rootMaw", region: "roots", name: "공허균근 아귀", x: 900, groundY: 960, bounds: [540, 1180], color: "#b984d8", hp: 13 },
+  { id: "clockKnight", region: "clock", name: "황동 균륜기사", x: 5900, groundY: -1060, bounds: [5300, 6180], color: "#f1d16f", hp: 14 },
+  { id: "bellCantor", region: "bell", name: "무언의 포자지휘자", x: 5700, groundY: -275, bounds: [5230, 6160], color: "#c4a2ff", hp: 15 },
+  { id: "archiveBinder", region: "archive", name: "심층 균문제본사", x: 5250, groundY: 2050, bounds: [4800, 5570], color: "#68ded0", hp: 15 },
+  { id: "forgeGolem", region: "forge", name: "잿불 열균핵", x: 9000, groundY: 475, bounds: [8700, 9380], color: "#ff8652", hp: 16 },
+  { id: "coastSiren", region: "coast", name: "푸른별 포자령", x: 10280, groundY: 1190, bounds: [10190, 10820], color: "#82d9ff", hp: 16 }
 ];
 
 const enemySeeds = [
@@ -641,25 +641,25 @@ function resetEntities() {
   };
   areaBosses = [
     {
-      id: "moonKeeper", kind: "moon", name: "월륜의 파수꾼",
+      id: "moonKeeper", kind: "moon", name: "월륜 포자지기",
       x: 6900, y: -1170, baseY: -1170, w: 70, h: 80, hp: 18, maxHp: 18,
       active: false, dead: save.areaBosses.includes("moonKeeper"), hit: 0,
       cooldown: .8, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
     {
-      id: "archiveKeeper", kind: "archive", name: "먹빛 사서",
+      id: "archiveKeeper", kind: "archive", name: "먹빛 균문사서",
       x: 6600, y: 1960, baseY: 1960, groundY: 2050, bounds: [6300, 6940], w: 76, h: 90, hp: 22, maxHp: 22,
       active: false, dead: save.areaBosses.includes("archiveKeeper"), hit: 0,
       cooldown: .9, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
     {
-      id: "forgeCore", kind: "forge", name: "잿불 제련심장",
+      id: "forgeCore", kind: "forge", name: "잿불 배양심장",
       x: 10500, y: 383, baseY: 383, groundY: FLOOR, bounds: [10180, 10920], w: 84, h: 92, hp: 28, maxHp: 28,
       active: false, dead: save.areaBosses.includes("forgeCore"), hit: 0,
       cooldown: .75, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
     },
     {
-      id: "starDevourer", kind: "coast", name: "별잠 포식자",
+      id: "starDevourer", kind: "coast", name: "별포자 포식체",
       x: 11920, y: 1092, baseY: 1092, groundY: 1190, bounds: [11680, 12320], w: 86, h: 98, hp: 32, maxHp: 32,
       active: false, dead: save.areaBosses.includes("starDevourer"), hit: 0,
       cooldown: .72, timer: 0, cycle: 0, dir: -1, vx: 0, vy: 0, lastAttack: -1
@@ -774,7 +774,7 @@ function storeSettings() {
 }
 
 function musicGain() {
-  return Math.max(.0001, gameSettings.musicVolume * 1.5);
+  return Math.max(.0001, gameSettings.musicVolume * 2.05);
 }
 
 function applyAudioSettings() {
@@ -970,13 +970,13 @@ function getGardenStock() {
   if (save.echoes.length >= 2) stage = 2;
   if (save.echoes.length >= 3) stage = 3;
   if (save.midBossDefeated) stage = 4;
-  const stageNames = ["새싹 진열대", "방랑자 진열대", "메아리 진열대", "정원사 진열대", "종루 원정대"];
+  const stageNames = ["발아 진열대", "균사 방랑자", "포자 메아리", "배양사 진열대", "균종루 원정대"];
   const nextConditions = [
     "그림자 대시를 발견하면 새 상품이 들어옵니다.",
     "메아리 조각을 2개 모으면 새 상품이 들어옵니다.",
     "메아리 조각을 모두 모으면 새 상품이 들어옵니다.",
-    "청록 수문장을 쓰러뜨리면 마지막 상품이 들어옵니다.",
-    "모든 정원 상품이 입고되었습니다."
+    "청록 균사수문장을 쓰러뜨리면 마지막 상품이 들어옵니다.",
+    "모든 포자 정원 상품이 입고되었습니다."
   ];
   return {
     stage,
@@ -1079,12 +1079,12 @@ function moveShopSelection(code) {
 
 function equipmentRows() {
   return [
-    ["weapon", "새벽의 칼날", "공격력 +1"],
-    ["armor", "이끼 갑옷", "최대 체력 +1"],
-    ["doubleJump", "나방의 날개", "공중 점프 +1"],
-    ["bellKey", "종루의 열쇠", "최종 관문 개방"],
+    ["weapon", "균사 침", "공격력 +1"],
+    ["armor", "균피 갑옷", "최대 체력 +1"],
+    ["doubleJump", "포자막", "공중 점프 +1"],
+    ["bellKey", "균종루의 열쇠", "최종 관문 개방"],
     ["dash", "그림자 대시", "C로 빠르게 돌진"],
-    ["resonance", "종의 공명", "정원 밖 공명문 개방"],
+    ["resonance", "균종의 공명", "균사 종루 밖 공명문 개방"],
     ["forgeHeart", "용광로 내성", "타오르는 봉인 통과"]
   ];
 }
@@ -1430,10 +1430,10 @@ function moveAndCollide(dt) {
     else if (player.vx < 0) player.x = p.x + p.w;
     player.vx = 0;
     if (p.gate === "echo" && save.echoes.length < 3) toast(`침묵의 문 · 메아리 ${save.echoes.length}/3`);
-    if (p.gate === "midboss") toast("수문장이 길을 막고 있습니다 · 중간 보스를 처치하세요");
-    if (p.gate === "boss") toast("심연의 종지기 관문 · 상점에서 종루의 열쇠를 준비하세요");
-    if (p.gate === "resonance") toast("잠든 공명문 · 심연의 종지기를 쓰러뜨려야 합니다");
-    if (p.gate === "forge" || p.gate === "forgeShortcut") toast("타오르는 봉인 · 잿불 제련심장을 쓰러뜨리세요");
+    if (p.gate === "midboss") toast("균사수문장이 길을 막고 있습니다 · 중간 보스를 처치하세요");
+    if (p.gate === "boss") toast("심연 균종지기 관문 · 상점에서 균종루의 열쇠를 준비하세요");
+    if (p.gate === "resonance") toast("잠든 공명문 · 심연 균종지기를 쓰러뜨려야 합니다");
+    if (p.gate === "forge" || p.gate === "forgeShortcut") toast("타오르는 균사 봉인 · 잿불 배양심장을 쓰러뜨리세요");
   }
 
   player.grounded = false;
@@ -2080,7 +2080,7 @@ function updateMidBoss(dt) {
       spawnCoins(midBoss.x + midBoss.w / 2, midBoss.y + midBoss.h / 2, 12);
       shake = 20;
       puff(midBoss.x + 30, midBoss.y + 35, "#b9fff1", 55, 290);
-      toast("수문장 격파 · 전용 인장 「수문장의 맥동」 획득", 4200);
+      toast("균사수문장 격파 · 전용 인장 「균사수문의 맥동」 획득", 4200);
     }
   }
   if (overlap(player, midBoss)) hurt(1, midBoss.x + midBoss.w / 2);
@@ -2114,10 +2114,10 @@ function defeatAreaBoss(areaBoss) {
       : areaBoss.kind === "forge" ? "#ff7548" : "#8edcff";
   puff(areaBoss.x + areaBoss.w / 2, areaBoss.y + areaBoss.h / 2, color, 65, 310);
   const messages = {
-    moon: "월륜의 파수꾼 격파 · 월륜 톱니와 인장 슬롯 +1 획득",
-    archive: "먹빛 사서 격파 · 전용 인장 「기록고의 왕관」 획득",
-    forge: "잿불 제련심장 격파 · 용광로 내성 획득 · 별잠 해안의 봉인 해제",
-    coast: "별잠 포식자 격파 · 정원 밖의 모든 길이 하나로 이어졌습니다"
+    moon: "월륜 포자지기 격파 · 월륜 균환과 인장 슬롯 +1 획득",
+    archive: "먹빛 균문사서 격파 · 전용 인장 「균문고의 포자관」 획득",
+    forge: "잿불 배양심장 격파 · 열균 내성 획득 · 별포자 습지의 봉인 해제",
+    coast: "별포자 포식체 격파 · 균사 왕국의 모든 길이 하나로 이어졌습니다"
   };
   toast(messages[areaBoss.kind], 4600);
   beep(areaBoss.kind === "moon" ? 760 : areaBoss.kind === "forge" ? 310 : 560, .8, "sine", .065);
@@ -2421,7 +2421,7 @@ function updateBoss(dt) {
       storeSave();
       bossProjectiles.length = 0;
       shake = 28; puff(boss.x + 40, boss.y + 50, "#e7fbff", 95, 330);
-      toast("심연의 종지기 격파 · 종의 공명과 인장 슬롯 +1 획득 · 오른쪽 문이 열렸습니다", 5200);
+      toast("심연 균종지기 격파 · 균종의 공명과 인장 슬롯 +1 획득 · 오른쪽 문이 열렸습니다", 5200);
       beep(920, .9, "sine", .07);
     }
   }
@@ -2453,6 +2453,68 @@ function roundRect(x, y, w, h, r) {
   ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
 }
 
+const regionNames = {
+  garden: "포자 정원", canopy: "발광 균관", clock: "월광 포자탑", bell: "균사 종루",
+  forge: "잿빛 배양로", coast: "별포자 습지", archive: "침수 균문고", roots: "가라앉은 균근"
+};
+
+const fungalPalettes = {
+  garden: { sky: ["#102126", "#09161b", "#050a0d"], far: "#173039", mid: "#12272e", rock: "#13252a", ridge: "#6bb89d", glow: "#9af0c5", cap: "#8dc6aa" },
+  canopy: { sky: ["#153027", "#0b211d", "#06110f"], far: "#21483a", mid: "#17372e", rock: "#153029", ridge: "#86d79e", glow: "#d4ffb1", cap: "#a5e6a9" },
+  roots: { sky: ["#23142c", "#160d20", "#09070f"], far: "#3d2550", mid: "#2c1b3b", rock: "#281b30", ridge: "#b476cb", glow: "#e7a5ff", cap: "#bf86ce" },
+  clock: { sky: ["#17182f", "#0e1024", "#070816"], far: "#292b4d", mid: "#1d203c", rock: "#20223a", ridge: "#c7aa61", glow: "#ffe69a", cap: "#d4bc78" },
+  bell: { sky: ["#241832", "#160f22", "#09070f"], far: "#3b2850", mid: "#2a1c3c", rock: "#291b36", ridge: "#b587d4", glow: "#e7b9ff", cap: "#be91dc" },
+  archive: { sky: ["#08262a", "#06191e", "#030b10"], far: "#104046", mid: "#0c3037", rock: "#102e33", ridge: "#54bfb1", glow: "#8affdf", cap: "#69c9b9" },
+  forge: { sky: ["#391b1c", "#211012", "#0c080a"], far: "#552827", mid: "#3b1c1e", rock: "#342022", ridge: "#ee7547", glow: "#ffba68", cap: "#d86d4b" },
+  coast: { sky: ["#112d3f", "#091d2b", "#050d16"], far: "#1a4961", mid: "#12394f", rock: "#142e3c", ridge: "#70c5df", glow: "#c5f6ff", cap: "#82cde2" }
+};
+
+function seededWave(value) {
+  return (Math.sin(value * 12.9898) * 43758.5453) % 1;
+}
+
+function drawFungalColumn(x, floorY, scale, color, glow, alpha = 1) {
+  const stemH = 120 * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x - 13 * scale, floorY);
+  ctx.bezierCurveTo(x - 22 * scale, floorY - stemH * .42, x - 9 * scale, floorY - stemH * .8, x - 5 * scale, floorY - stemH);
+  ctx.lineTo(x + 7 * scale, floorY - stemH);
+  ctx.bezierCurveTo(x + 14 * scale, floorY - stemH * .7, x + 26 * scale, floorY - stemH * .3, x + 17 * scale, floorY);
+  ctx.closePath(); ctx.fill();
+  ctx.shadowColor = glow; ctx.shadowBlur = 16 * scale;
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.moveTo(x - 48 * scale, floorY - stemH + 5 * scale);
+  ctx.quadraticCurveTo(x, floorY - stemH - 45 * scale, x + 52 * scale, floorY - stemH + 6 * scale);
+  ctx.quadraticCurveTo(x, floorY - stemH + 25 * scale, x - 48 * scale, floorY - stemH + 5 * scale);
+  ctx.fill();
+  ctx.globalAlpha *= .42;
+  ctx.fillStyle = "#f4fff1";
+  ctx.beginPath(); ctx.ellipse(x - 7 * scale, floorY - stemH - 6 * scale, 16 * scale, 4 * scale, -.18, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawFungalParallax(region) {
+  const p = fungalPalettes[region];
+  ctx.save();
+  for (let layer = 0; layer < 3; layer++) {
+    const depth = .045 + layer * .055;
+    const spacing = 170 - layer * 18;
+    for (let i = -2; i < Math.ceil(W / spacing) + 3; i++) {
+      const worldIndex = Math.floor(camera.x * depth / spacing) + i;
+      const x = i * spacing - (camera.x * depth % spacing) + (worldIndex % 3) * 21;
+      const n = Math.abs(seededWave(worldIndex + layer * 41));
+      const scale = .7 + n * .75 + layer * .18;
+      const floorY = H + 28 - layer * 32 - n * 24 - camera.y * depth * .06;
+      drawFungalColumn(x, floorY, scale, layer === 0 ? p.far : p.mid, p.glow, .14 + layer * .08);
+    }
+  }
+  ctx.restore();
+}
+
 function drawBackground() {
   const region = getRegionAt(player.x + player.w / 2, player.y + player.h / 2);
   const clocktower = region === "clock";
@@ -2460,20 +2522,13 @@ function drawBackground() {
   const forge = region === "forge";
   const coast = region === "coast";
   const archive = region === "archive";
-  const palette = clocktower
-    ? ["#11152c", "#0c1023", "#070918"]
-    : bell
-      ? ["#211933", "#151124", "#090812"]
-    : forge
-      ? ["#351b20", "#1d1118", "#0d0a0f"]
-      : coast
-        ? ["#132843", "#0b1c33", "#07101f"]
-    : archive
-      ? ["#071d25", "#07171e", "#040d13"]
-      : ["#11182c", "#0b1321", "#070b12"];
+  const palette = fungalPalettes[region].sky;
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, palette[0]); grad.addColorStop(.65, palette[1]); grad.addColorStop(1, palette[2]);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+  // 거대한 균사 기둥을 세 겹으로 배치해 방마다 깊이와 실루엣을 만든다.
+  drawFungalParallax(region);
 
   for (let layer = 0; layer < 3; layer++) {
     const depth = .08 + layer * .09;
@@ -2614,7 +2669,7 @@ function drawBackground() {
 function drawExpandedRegionDetails() {
   ctx.save();
 
-  // 빛의 수관 · 황혼 잎맥 온실
+  // 발광 균관 · 황혼 포자 온실
   ctx.fillStyle = "rgba(73,132,102,.12)";
   ctx.fillRect(1720, -1030, 1900, 300);
   for (let x = 1800; x < 3550; x += 180) {
@@ -2631,9 +2686,9 @@ function drawExpandedRegionDetails() {
   }
   ctx.fillStyle = "rgba(193,244,207,.82)";
   ctx.font = "bold 22px Georgia, serif";
-  ctx.fillText("황혼 잎맥 온실", 1830, -865);
+  ctx.fillText("황혼 포자 온실", 1830, -865);
 
-  // 달빛 시계탑 · 천구의 회랑
+  // 월광 포자탑 · 균륜 회랑
   ctx.fillStyle = "rgba(207,181,92,.07)";
   ctx.fillRect(5200, -1370, 2160, 330);
   for (let x = 5360; x < 7240; x += 260) {
@@ -2653,9 +2708,9 @@ function drawExpandedRegionDetails() {
   }
   ctx.fillStyle = "rgba(255,230,147,.82)";
   ctx.font = "bold 22px Georgia, serif";
-  ctx.fillText("천구의 회랑", 5350, -1090);
+  ctx.fillText("월륜 균사 회랑", 5350, -1090);
 
-  // 종루 · 공명의 수직 회랑
+  // 균사 종루 · 공명의 수직 회랑
   ctx.fillStyle = "rgba(126,88,165,.09)";
   ctx.fillRect(5150, -620, 1120, 1095);
   for (let x = 5260; x < 6200; x += 190) {
@@ -2670,7 +2725,7 @@ function drawExpandedRegionDetails() {
   ctx.font = "bold 22px Georgia, serif";
   ctx.fillText("공명의 수직 회랑", 5290, -325);
 
-  // 가라앉은 뿌리 · 공허한 하층림
+  // 가라앉은 균근 · 공허한 하층림
   ctx.fillStyle = "rgba(91,54,116,.11)";
   ctx.fillRect(430, 620, 1880, 500);
   for (let x = 520; x < 2260; x += 130) {
@@ -2683,9 +2738,9 @@ function drawExpandedRegionDetails() {
   }
   ctx.fillStyle = "rgba(207,159,232,.78)";
   ctx.font = "bold 22px Georgia, serif";
-  ctx.fillText("공허한 하층림", 600, 925);
+  ctx.fillText("공허한 균근림", 600, 925);
 
-  // 침수된 기록고 · 심층 서고
+  // 침수 균문고 · 심층 배양서고
   ctx.fillStyle = "rgba(35,157,153,.1)";
   ctx.fillRect(2920, 1740, 4140, 590);
   for (let x = 3100; x < 6950; x += 250) {
@@ -2705,9 +2760,9 @@ function drawExpandedRegionDetails() {
   }
   ctx.fillStyle = "rgba(130,235,225,.82)";
   ctx.font = "bold 22px Georgia, serif";
-  ctx.fillText("가장 깊은 서고", 3150, 2015);
+  ctx.fillText("가장 깊은 균문고", 3150, 2015);
 
-  // 잿빛 제련소 · 대제련장
+  // 잿빛 배양로 · 열균 배양장
   ctx.fillStyle = "rgba(255,85,37,.085)";
   ctx.fillRect(7820, 80, 3260, 470);
   for (let x = 7950; x < 10950; x += 230) {
@@ -2720,9 +2775,9 @@ function drawExpandedRegionDetails() {
   }
   ctx.fillStyle = "rgba(255,158,98,.85)";
   ctx.font = "bold 22px Georgia, serif";
-  ctx.fillText("대제련장", 8000, 445);
+  ctx.fillText("열균 대배양장", 8000, 445);
 
-  // 별잠 해안 · 별무덤 방파제
+  // 별포자 습지 · 별무덤 방파제
   ctx.fillStyle = "rgba(80,164,216,.1)";
   ctx.fillRect(8620, 900, 3780, 480);
   for (let x = 8760; x < 12250; x += 310) {
@@ -2741,7 +2796,67 @@ function drawExpandedRegionDetails() {
   }
   ctx.fillStyle = "rgba(177,227,255,.84)";
   ctx.font = "bold 22px Georgia, serif";
-  ctx.fillText("별무덤 방파제", 8840, 1160);
+  ctx.fillText("별포자 방파제", 8840, 1160);
+  ctx.restore();
+}
+
+function drawOrganicPlatform(p, region) {
+  const palette = fungalPalettes[region];
+  const thick = p.h > 50;
+  const topH = Math.min(p.h, thick ? 16 : 9);
+  ctx.save();
+
+  const body = ctx.createLinearGradient(p.x, p.y, p.x, p.y + Math.min(p.h, 130));
+  body.addColorStop(0, palette.rock);
+  body.addColorStop(1, "#070b0d");
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y + 5);
+  for (let x = p.x; x <= p.x + p.w; x += 24) {
+    const edge = Math.sin(x * .071) * 3;
+    ctx.lineTo(Math.min(x, p.x + p.w), p.y + 4 + edge);
+  }
+  ctx.lineTo(p.x + p.w, p.y + p.h);
+  ctx.lineTo(p.x, p.y + p.h);
+  ctx.closePath(); ctx.fill();
+
+  ctx.shadowColor = palette.glow;
+  ctx.shadowBlur = thick ? 9 : 6;
+  ctx.fillStyle = palette.ridge;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y + 5);
+  for (let x = p.x; x <= p.x + p.w; x += 18) {
+    ctx.quadraticCurveTo(x + 6, p.y - 2 - Math.sin(x * .09) * 2, Math.min(x + 18, p.x + p.w), p.y + 5);
+  }
+  ctx.lineTo(p.x + p.w, p.y + topH);
+  ctx.lineTo(p.x, p.y + topH);
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = palette.mid;
+  ctx.lineWidth = thick ? 3 : 2;
+  for (let x = p.x + 22; x < p.x + p.w - 8; x += 46) {
+    const length = Math.min(p.h - topH, 18 + Math.abs(Math.sin(x * .17)) * 35);
+    if (length < 5) continue;
+    ctx.beginPath();
+    ctx.moveTo(x, p.y + topH);
+    ctx.bezierCurveTo(x - 10, p.y + topH + length * .35, x + 11, p.y + topH + length * .7, x - 2, p.y + topH + length);
+    ctx.stroke();
+  }
+
+  // 긴 지형의 가장자리에만 작은 버섯을 심어 발판 판독성을 유지한다.
+  if (p.w >= 130 && p.h >= 16) {
+    const count = Math.min(3, Math.floor(p.w / 180) + 1);
+    for (let i = 0; i < count; i++) {
+      const mx = p.x + 24 + ((i * 97 + Math.abs(Math.floor(p.x))) % Math.max(36, p.w - 48));
+      const size = 5 + (i + Math.floor(p.x / 100)) % 4;
+      ctx.strokeStyle = palette.cap; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(mx, p.y + 1); ctx.quadraticCurveTo(mx + 2, p.y - size, mx + 1, p.y - size * 1.7); ctx.stroke();
+      ctx.fillStyle = palette.glow; ctx.globalAlpha = .65;
+      ctx.beginPath(); ctx.ellipse(mx + 1, p.y - size * 1.7, size, size * .42, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
   ctx.restore();
 }
 
@@ -2750,11 +2865,12 @@ function drawWorld() {
   ctx.translate(-camera.x, -camera.y);
   drawExpandedRegionDetails();
 
-  // distant bells and plants
+  // 멀리 이어진 포자낭과 균사 줄기
   for (let x = 180; x < 6200; x += 430) {
-    ctx.strokeStyle = "#223553"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 115 + (x % 90)); ctx.stroke();
-    ctx.fillStyle = "#182941"; ctx.beginPath(); ctx.ellipse(x, 130 + (x % 90), 25, 33, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#294f48"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x, -40); ctx.bezierCurveTo(x + 30, 40, x - 25, 95, x, 145 + (x % 70)); ctx.stroke();
+    ctx.fillStyle = "#203b38"; ctx.beginPath(); ctx.ellipse(x, 154 + (x % 70), 31, 18, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(144,239,194,.25)"; ctx.beginPath(); ctx.ellipse(x, 150 + (x % 70), 21, 5, 0, 0, Math.PI * 2); ctx.fill();
   }
 
   // vertical garden landmarks
@@ -2777,16 +2893,16 @@ function drawWorld() {
   }
   ctx.fillStyle = "rgba(194,232,211,.7)";
   ctx.font = "bold 16px system-ui";
-  ctx.fillText("↑  빛의 수관", 3415, 330);
+  ctx.fillText("↑  발광 균관", 3415, 330);
   ctx.fillStyle = "rgba(202,174,224,.72)";
-  ctx.fillText("↓  가라앉은 뿌리", 2815, 446);
+  ctx.fillText("↓  가라앉은 균근", 2815, 446);
   ctx.fillStyle = "rgba(246,218,132,.75)";
-  ctx.fillText("↑  수관 끝 · 달빛 시계탑", 3260, -575);
+  ctx.fillText("↑  균관 끝 · 월광 포자탑", 3260, -575);
   ctx.fillStyle = "rgba(105,220,207,.75)";
-  ctx.fillText("→  뿌리 끝 · 침수된 기록고", 3460, 930);
+  ctx.fillText("→  균근 끝 · 침수 균문고", 3460, 930);
   ctx.restore();
 
-  // moonlit clocktower
+  // moonlit spore tower
   ctx.save();
   ctx.strokeStyle = "rgba(232,205,114,.22)";
   ctx.lineWidth = 8;
@@ -2815,13 +2931,13 @@ function drawWorld() {
   }
   ctx.fillStyle = "rgba(255,229,150,.78)";
   ctx.font = "bold 20px system-ui";
-  ctx.fillText("달빛 시계탑", 4400, -1100);
+  ctx.fillText("월광 포자탑", 4400, -1100);
   ctx.fillStyle = "rgba(255,236,178,.62)";
   ctx.font = "15px system-ui";
-  ctx.fillText("수관 너머, 멈춘 달의 시간이 흐르는 곳", 4400, -1080);
+  ctx.fillText("균관 너머, 달빛 포자의 시간이 고리 도는 곳", 4400, -1080);
   ctx.restore();
 
-  // flooded archive
+  // flooded mycelial archive
   ctx.save();
   ctx.fillStyle = "rgba(47,161,157,.1)";
   ctx.fillRect(3920, 1140, 1330, 310);
@@ -2847,13 +2963,13 @@ function drawWorld() {
   }
   ctx.fillStyle = "rgba(122,235,220,.82)";
   ctx.font = "bold 20px system-ui";
-  ctx.fillText("침수된 기록고", 4020, 1160);
+  ctx.fillText("침수 균문고", 4020, 1160);
   ctx.fillStyle = "rgba(160,224,220,.62)";
   ctx.font = "15px system-ui";
-  ctx.fillText("뿌리 아래, 잊힌 문장이 물속을 떠도는 곳", 4020, 1178);
+  ctx.fillText("균근 아래, 잊힌 기억 포자가 물속을 떠도는 곳", 4020, 1178);
   ctx.restore();
 
-  // ashen forge
+  // ashen incubator
   ctx.save();
   ctx.fillStyle = "rgba(255,93,45,.08)";
   ctx.fillRect(6180, 120, 1660, 430);
@@ -2874,13 +2990,13 @@ function drawWorld() {
   }
   ctx.fillStyle = "rgba(255,154,91,.86)";
   ctx.font = "bold 20px system-ui";
-  ctx.fillText("잿빛 제련소", 6250, 455);
+  ctx.fillText("잿빛 배양로", 6250, 455);
   ctx.fillStyle = "rgba(244,179,140,.68)";
   ctx.font = "15px system-ui";
-  ctx.fillText("종의 금속을 녹이던 불씨가 아직 숨 쉬는 곳", 6250, 473);
+  ctx.fillText("재와 열을 먹는 붉은 곰팡이가 숨 쉬는 곳", 6250, 473);
   ctx.restore();
 
-  // sleeping coast and the archive loop
+  // star-spore marsh and the archive loop
   ctx.save();
   ctx.fillStyle = "rgba(90,169,226,.09)";
   ctx.fillRect(5200, 990, 3400, 460);
@@ -2903,12 +3019,12 @@ function drawWorld() {
   }
   ctx.fillStyle = "rgba(169,224,255,.88)";
   ctx.font = "bold 20px system-ui";
-  ctx.fillText("별잠 해안", 7750, 1160);
+  ctx.fillText("별포자 습지", 7750, 1160);
   ctx.fillStyle = "rgba(179,215,239,.7)";
   ctx.font = "15px system-ui";
-  ctx.fillText("잠든 별이 밀려오고, 기록고로 되돌아가는 바닷길", 7750, 1179);
+  ctx.fillText("잠든 별포자가 밀려와 균문고로 스며드는 물길", 7750, 1179);
   ctx.fillStyle = "rgba(129,211,207,.72)";
-  ctx.fillText("← 침수된 기록고로 이어지는 순환 통로", 5350, 1160);
+  ctx.fillText("← 침수 균문고로 이어지는 순환 통로", 5350, 1160);
   ctx.restore();
 
   // layered ornaments: luminous garden, canopy, roots, gears and drifting records
@@ -2995,49 +3111,27 @@ function drawWorld() {
   ctx.restore();
 
   platforms.forEach(p => {
+    if (p.x + p.w < camera.x - 80 || p.x > camera.x + W + 80 || p.y + p.h < camera.y - 80 || p.y > camera.y + H + 80) return;
     const platformRegion = getRegionAt(p.x + p.w / 2, p.y - 2);
-    const colors = {
-      garden: ["#172333", "#213046", "#344a5e", "#213448"],
-      canopy: ["#173128", "#26483b", "#66b58a", "#244d3d"],
-      roots: ["#251b31", "#3c2b4b", "#9b68b8", "#4c315b"],
-      clock: ["#1c2138", "#34364c", "#c6a95d", "#58506d"],
-      bell: ["#241a34", "#3d2b51", "#aa82cf", "#563c6d"],
-      archive: ["#102b31", "#21454a", "#4ca89f", "#183c43"],
-      forge: ["#2d1b1c", "#51302b", "#e76f3f", "#6b3027"],
-      coast: ["#142d43", "#264b65", "#6fbde3", "#1a3c58"]
-    }[platformRegion];
-    ctx.fillStyle = p.h > 50 ? colors[0] : colors[1];
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = colors[2];
-    ctx.fillRect(p.x, p.y, p.w, 4);
-    ctx.strokeStyle = colors[3];
-    ctx.lineWidth = 2;
-    for (let x = p.x + 18; x < p.x + p.w; x += 42) {
-      ctx.beginPath();
-      ctx.moveTo(x, p.y + 7);
-      ctx.lineTo(x - 8, p.y + Math.min(38, p.h));
-      ctx.stroke();
-    }
+    drawOrganicPlatform(p, platformRegion);
   });
 
   movingPlatforms.forEach(p => {
+    if (p.x + p.w < camera.x - 80 || p.x > camera.x + W + 80 || p.y + p.h < camera.y - 80 || p.y > camera.y + H + 80) return;
     ctx.save();
-    ctx.shadowColor = "#78dff0";
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = "#29475a";
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = "#8be8ef";
-    ctx.fillRect(p.x + 5, p.y, p.w - 10, 3);
-    ctx.strokeStyle = "#456b79";
-    ctx.beginPath();
-    ctx.moveTo(p.x + 12, p.y + 8);
-    ctx.lineTo(p.x + p.w - 12, p.y + 8);
-    ctx.stroke();
+    ctx.shadowColor = "#91f5d5"; ctx.shadowBlur = 15;
+    ctx.fillStyle = "#274b46";
+    ctx.beginPath(); ctx.ellipse(p.x + p.w / 2, p.y + 7, p.w / 2, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#a5f2d0";
+    ctx.beginPath(); ctx.ellipse(p.x + p.w / 2, p.y + 1, p.w * .42, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#4c8175"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(p.x + 15, p.y + 7); ctx.quadraticCurveTo(p.x + p.w / 2, p.y + 17, p.x + p.w - 15, p.y + 7); ctx.stroke();
     ctx.restore();
   });
 
   crumblePlatforms.forEach(p => {
     if (p.gone > 0) return;
+    if (p.x + p.w < camera.x - 80 || p.x > camera.x + W + 80 || p.y + p.h < camera.y - 80 || p.y > camera.y + H + 80) return;
     const jitter = p.timer > 0 ? Math.sin(time * 48) * 2 : 0;
     ctx.save();
     ctx.translate(jitter, 0);
@@ -3314,84 +3408,56 @@ function drawEnemy(e) {
     ctx.scale(1.25, .78);
   }
   if (e.hit > 0) ctx.globalAlpha = .55;
-  ctx.fillStyle = e.type === "clockwork" ? "#6d5c3c"
-    : e.type === "inkling" ? "#174b50"
-      : e.type === "emberling" ? "#6d2d25"
-        : e.type === "starling" ? "#294b73"
-          : e.type === "flyer" ? "#6f6b91" : "#45586a";
-  ctx.beginPath(); ctx.ellipse(0, 2, e.w / 2, e.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+  const style = {
+    crawler: ["#324e43", "#88d79d", "#bcffd1"],
+    flyer: ["#4a3d61", "#b588d7", "#efc6ff"],
+    clockwork: ["#66552e", "#dbc05d", "#fff0a2"],
+    inkling: ["#164a49", "#58cdbb", "#a6ffe8"],
+    emberling: ["#6a2b21", "#ef7044", "#ffd083"],
+    starling: ["#234a67", "#68bddd", "#d7f7ff"]
+  }[e.type] || ["#324e43", "#88d79d", "#bcffd1"];
+  ctx.shadowColor = style[1]; ctx.shadowBlur = e.action === "cast" ? 18 : 8;
+
+  // 모든 일반 적은 균핵 몸통 + 고유 포자낭 실루엣으로 구분한다.
+  ctx.fillStyle = style[0];
+  ctx.beginPath(); ctx.ellipse(0, 6, e.w * .42, e.h * .42, 0, 0, Math.PI * 2); ctx.fill();
   if (e.type === "flyer" || e.type === "starling") {
-    ctx.fillStyle = e.type === "starling" ? "#3e75a0" : "#363b59";
-    const wingTilt = e.action === "dive" ? .12 : .4;
-    ctx.beginPath();
-    ctx.ellipse(-18, -2, 15, 7, -wingTilt, 0, Math.PI * 2);
-    ctx.ellipse(18, -2, 15, 7, wingTilt, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (e.type === "clockwork") {
-    ctx.strokeStyle = "#e7c969";
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 8; i++) {
-      const angle = i * Math.PI / 4 + time;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * 17, Math.sin(angle) * 15);
-      ctx.lineTo(Math.cos(angle) * 24, Math.sin(angle) * 21);
-      ctx.stroke();
-    }
-    ctx.beginPath();
-    ctx.arc(0, 2, 11, 0, Math.PI * 2);
-    ctx.stroke();
-    if (e.action === "cast") {
-      ctx.strokeStyle = "rgba(255,232,143,.78)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 2, 30 + Math.sin(time * 20) * 5, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (e.type === "inkling") {
-    ctx.fillStyle = "rgba(91,218,205,.5)";
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.ellipse(i * 11, 17 + Math.sin(time * 5 + i) * 4, 6, 13, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.strokeStyle = "#67d8cd";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, -1, 14, Math.PI, Math.PI * 2);
-    ctx.stroke();
-  } else if (e.type === "emberling") {
-    ctx.fillStyle = "#ff7548";
-    ctx.shadowColor = "#ff5b35";
-    ctx.shadowBlur = 13;
+    ctx.fillStyle = style[1]; ctx.globalAlpha = .7;
     for (let i = -2; i <= 2; i++) {
       ctx.beginPath();
-      ctx.moveTo(i * 8 - 5, -10);
-      ctx.lineTo(i * 8, -25 - Math.sin(time * 9 + i) * 5);
-      ctx.lineTo(i * 8 + 6, -9);
+      ctx.ellipse(i * 8, -5 + Math.abs(i) * 2, 9, 5, i * .18, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (e.action === "bite") {
-      ctx.fillStyle = "#2a1010";
-      ctx.fillRect(e.dir * 12 - 5, -3, 16, 13);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = style[1]; ctx.lineWidth = 2;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath(); ctx.moveTo(i * 8, 13); ctx.quadraticCurveTo(i * 11 + Math.sin(time * 5 + i) * 5, 24, i * 7, 29); ctx.stroke();
     }
-  } else if (e.action === "bite") {
-    ctx.fillStyle = "#172535";
+  } else if (e.type === "clockwork") {
+    ctx.strokeStyle = style[1]; ctx.lineWidth = 3;
+    for (let i = 0; i < 9; i++) {
+      const angle = i * Math.PI * 2 / 9 + time;
+      ctx.beginPath(); ctx.moveTo(Math.cos(angle) * 14, Math.sin(angle) * 13); ctx.lineTo(Math.cos(angle) * 24, Math.sin(angle) * 21); ctx.stroke();
+    }
+    ctx.fillStyle = style[1]; ctx.beginPath(); ctx.arc(0, 2, 9 + Math.sin(time * 3), 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillStyle = style[1];
     ctx.beginPath();
-    ctx.moveTo(e.dir * 11, 2);
-    ctx.lineTo(e.dir * 22, -7);
-    ctx.lineTo(e.dir * 22, 11);
-    ctx.closePath();
+    ctx.moveTo(-e.w * .48, -3);
+    ctx.quadraticCurveTo(0, -e.h * .72 - (e.type === "emberling" ? Math.sin(time * 8) * 5 : 0), e.w * .48, -3);
+    ctx.quadraticCurveTo(0, 8, -e.w * .48, -3);
     ctx.fill();
+    ctx.strokeStyle = style[1]; ctx.lineWidth = 2;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath(); ctx.moveTo(i * 9, 10); ctx.quadraticCurveTo(i * 12, 20, i * 7, e.h / 2 + 4); ctx.stroke();
+    }
   }
-  ctx.fillStyle = e.type === "clockwork" ? "#fff0a9"
-    : e.type === "inkling" ? "#9ffff1"
-      : e.type === "emberling" ? "#ffe09a"
-        : e.type === "starling" ? "#f1fbff" : "#aeeaff";
-  ctx.shadowColor = e.type === "clockwork" ? "#e4bc45"
-    : e.type === "inkling" ? "#57d9ce"
-      : e.type === "emberling" ? "#ff643c" : "#86dfff";
-  ctx.shadowBlur = 8;
-  ctx.beginPath(); ctx.arc(e.dir * 7, -3, 3, 0, Math.PI * 2); ctx.fill();
+  if (e.action === "bite" || e.action === "lunge") {
+    ctx.fillStyle = "#0d1715";
+    ctx.beginPath(); ctx.moveTo(e.dir * 8, 2); ctx.lineTo(e.dir * 23, -5); ctx.lineTo(e.dir * 23, 10); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = style[2]; ctx.shadowColor = style[2]; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(e.dir * 6, 1, 2.7, 0, Math.PI * 2); ctx.fill();
   ctx.restore(); ctx.shadowBlur = 0;
 }
 
@@ -3413,8 +3479,11 @@ function drawElite(elite) {
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = elite.color;
-  ctx.fillRect(-18, -17, 36, 8);
-  ctx.fillRect(-23, 13, 46, 6);
+  ctx.beginPath();
+  ctx.moveTo(-32, -14); ctx.quadraticCurveTo(0, -48, 34, -14); ctx.quadraticCurveTo(0, 1, -32, -14); ctx.fill();
+  ctx.globalAlpha = .55;
+  for (let i = -2; i <= 2; i++) { ctx.fillStyle = "#effff4"; ctx.beginPath(); ctx.arc(i * 11, -17 - Math.abs(i) * 3, 3, 0, Math.PI * 2); ctx.fill(); }
+  ctx.globalAlpha = 1;
   ctx.fillStyle = "#edfaff";
   ctx.fillRect(elite.dir * 7 - 2, -8, 5, 5);
   ctx.strokeStyle = elite.color;
@@ -3555,13 +3624,13 @@ function drawMidBoss() {
   ctx.beginPath();
   ctx.ellipse(0, -20, 22, 25, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#8acfc8";
-  ctx.lineWidth = 6;
-  ctx.lineCap = "round";
+  ctx.fillStyle = "#69b7a3";
+  ctx.shadowColor = "#8ffff0"; ctx.shadowBlur = 15;
   ctx.beginPath();
-  ctx.moveTo(-11, -37); ctx.quadraticCurveTo(-26, -61, -35, -43);
-  ctx.moveTo(11, -37); ctx.quadraticCurveTo(26, -61, 35, -43);
-  ctx.stroke();
+  ctx.moveTo(-37, -35); ctx.quadraticCurveTo(0, -70, 39, -35); ctx.quadraticCurveTo(0, -14, -37, -35); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(221,255,232,.62)";
+  ctx.beginPath(); ctx.ellipse(-9, -43, 12, 4, -.2, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = "#173035";
   ctx.beginPath();
   ctx.arc(-7, -21, 3, 0, Math.PI * 2);
@@ -3597,11 +3666,13 @@ function drawBoss() {
   ctx.shadowColor = enraged ? "#e56cff" : "#8d70c4";
   ctx.shadowBlur = enraged ? 24 : 12;
   ctx.fillStyle = enraged ? "#3d1f49" : "#26243b"; ctx.beginPath(); ctx.ellipse(0, 12, 39, 53, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#d7e3ee"; ctx.beginPath(); ctx.ellipse(0, -35, 29, 34, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = enraged ? "#f0c8ff" : "#d7e3ee"; ctx.lineWidth = 8; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(-15, -57); ctx.quadraticCurveTo(-38, -93, -50, -63); ctx.moveTo(15, -57); ctx.quadraticCurveTo(38, -93, 50, -63); ctx.stroke();
+  ctx.fillStyle = "#d7e3ee"; ctx.beginPath(); ctx.ellipse(0, -28, 27, 33, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = enraged ? "#d769e9" : "#8f73bd";
+  ctx.beginPath(); ctx.moveTo(-55, -46); ctx.quadraticCurveTo(0, -105, 57, -46); ctx.quadraticCurveTo(0, -16, -55, -46); ctx.fill();
+  ctx.fillStyle = enraged ? "rgba(255,218,255,.65)" : "rgba(226,214,255,.55)";
+  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(i * 16, -53 - Math.abs(i) * 5, 4 + (i + 2) % 3, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = enraged ? "#c537e8" : "#111624";
-  ctx.beginPath(); ctx.arc(-9, -35, enraged ? 5 : 4, 0, Math.PI * 2); ctx.arc(9, -35, enraged ? 5 : 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-9, -28, enraged ? 5 : 4, 0, Math.PI * 2); ctx.arc(9, -28, enraged ? 5 : 4, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
   ctx.shadowBlur = 0;
 }
@@ -3629,21 +3700,34 @@ function drawPlayer() {
     for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.ellipse(-i * 17, 2, 12, 19, 0, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
-  ctx.fillStyle = save.shopItems.includes("armor") ? "#28505a" : "#172033";
-  ctx.beginPath(); ctx.ellipse(0, 9, save.shopItems.includes("armor") ? 15 : 13, 18, 0, 0, Math.PI * 2); ctx.fill();
+  const stride = player.grounded && Math.abs(player.vx) > 20 ? Math.sin(time * 14) : 0;
+  // 균사 방랑자: 뿔 대신 넓은 버섯 갓과 포자 망토를 가진 고유 실루엣.
+  ctx.fillStyle = save.shopItems.includes("armor") ? "#285b55" : "#142b2d";
+  ctx.beginPath();
+  ctx.moveTo(-13, 0); ctx.quadraticCurveTo(-18 - stride * 2, 18, -9, 27);
+  ctx.quadraticCurveTo(0, 22 + stride * 2, 9, 27);
+  ctx.quadraticCurveTo(18 + stride * 2, 17, 13, 0);
+  ctx.closePath(); ctx.fill();
   if (save.shopItems.includes("armor")) {
-    ctx.strokeStyle = "#83b8b7";
+    ctx.strokeStyle = "#8ed0b8";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(-13, 1); ctx.lineTo(-18, 8);
-    ctx.moveTo(13, 1); ctx.lineTo(18, 8);
+    ctx.moveTo(-13, 4); ctx.quadraticCurveTo(0, 13, 13, 4);
+    ctx.moveTo(-11, 11); ctx.quadraticCurveTo(0, 19, 11, 11);
     ctx.stroke();
   }
-  ctx.fillStyle = "#e9f3f8"; ctx.beginPath(); ctx.ellipse(0, -11, 11, 14, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "#e9f3f8"; ctx.lineWidth = 4; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(-5, -20); ctx.quadraticCurveTo(-10, -33, -15, -27); ctx.moveTo(5, -20); ctx.quadraticCurveTo(10, -33, 15, -27); ctx.stroke();
-  ctx.fillStyle = "#182234"; ctx.beginPath(); ctx.arc(-4, -11, 1.6, 0, Math.PI * 2); ctx.arc(4, -11, 1.6, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "#9dc2d7"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-10, 6); ctx.quadraticCurveTo(-22, 16, -16, 28); ctx.stroke();
+  ctx.fillStyle = "#dff4e8";
+  ctx.beginPath(); ctx.ellipse(0, -8, 10, 13, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowColor = "#a8ffd4"; ctx.shadowBlur = 9;
+  ctx.fillStyle = "#91c9aa";
+  ctx.beginPath();
+  ctx.moveTo(-20, -16); ctx.quadraticCurveTo(0, -37, 22, -16); ctx.quadraticCurveTo(0, -7, -20, -16); ctx.fill();
+  ctx.fillStyle = "rgba(226,255,231,.75)";
+  ctx.beginPath(); ctx.ellipse(-5, -21, 8, 3, -.18, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#142226"; ctx.beginPath(); ctx.arc(-4, -8, 1.6, 0, Math.PI * 2); ctx.arc(4, -8, 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#a7e5c8"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-11, 5); ctx.quadraticCurveTo(-23 - stride * 2, 15, -17, 28); ctx.stroke();
   if (player.attack > 0) {
     const t = 1 - player.attack / .22;
     const improved = save.shopItems.includes("weapon");
@@ -3667,9 +3751,11 @@ function drawPlayer() {
 function drawHUD() {
   ctx.save();
   for (let i = 0; i < player.maxHp; i++) {
-    ctx.fillStyle = i < player.hp ? "#e7f7ff" : "#28364b";
-    ctx.shadowColor = i < player.hp ? "#88dfff" : "transparent"; ctx.shadowBlur = 9;
-    ctx.beginPath(); ctx.moveTo(28 + i * 25, 24); ctx.quadraticCurveTo(38 + i * 25, 12, 48 + i * 25, 24); ctx.quadraticCurveTo(38 + i * 25, 39, 28 + i * 25, 24); ctx.fill();
+    const hx = 38 + i * 25;
+    ctx.fillStyle = i < player.hp ? "#c9f4d7" : "#263b3b";
+    ctx.shadowColor = i < player.hp ? "#84efb6" : "transparent"; ctx.shadowBlur = 9;
+    ctx.beginPath(); ctx.moveTo(hx - 11, 25); ctx.quadraticCurveTo(hx, 10, hx + 12, 25); ctx.quadraticCurveTo(hx, 31, hx - 11, 25); ctx.fill();
+    ctx.fillRect(hx - 2, 25, 4, 9);
   }
   ctx.shadowBlur = 0;
   ctx.fillStyle = "rgba(5,9,18,.65)"; ctx.fillRect(W - 194, 16, 170, 40);
@@ -3679,10 +3765,6 @@ function drawHUD() {
     ctx.strokeRect(W - 67 + i * 14, 29, 7, 7);
   }
 
-  const regionNames = {
-    garden: "정원", canopy: "빛의 수관", clock: "달빛 시계탑", bell: "종루",
-    forge: "잿빛 제련소", coast: "별잠 해안", archive: "침수된 기록고", roots: "가라앉은 뿌리"
-  };
   const room = regionNames[getRegionAt(player.x + player.w / 2, player.y + player.h / 2)];
   ctx.textAlign = "center"; ctx.fillStyle = "rgba(225,239,250,.82)"; ctx.font = "bold 16px Georgia, serif"; ctx.fillText(room, W / 2, 32);
   const explored = save.echoes.length + save.shopItems.length
@@ -3727,8 +3809,8 @@ function drawHUD() {
             ? "#82d9ff" : "#70d5cd";
     ctx.fillRect(x, y, bw * activeBoss.hp / activeBoss.maxHp, 7);
     ctx.fillStyle = "#d9d4ea"; ctx.font = "bold 14px system-ui";
-    ctx.fillText(activeBoss === boss ? "심연의 종지기"
-      : activeBoss === midBoss ? "청록 수문장" : activeBoss.name, W / 2, y - 7);
+    ctx.fillText(activeBoss === boss ? "심연 균종지기"
+      : activeBoss === midBoss ? "청록 균사수문장" : activeBoss.name, W / 2, y - 7);
   }
 
   ctx.textAlign = "right";
@@ -3831,10 +3913,10 @@ function win() {
     && save.areaBosses.length === areaBosses.length
     && save.eliteDefeated.length === eliteDefs.length
     && save.discoveries.length === landmarks.length;
-  const endingTitle = completeGarden ? "모든 세계가 하나로 이어졌습니다" : "별잠 해안이 깨어났습니다";
+  const endingTitle = completeGarden ? "모든 균사망이 하나로 이어졌습니다" : "별포자 습지가 깨어났습니다";
   const endingText = completeGarden
-    ? "정원과 시계탑, 기록고, 제련소와 해안이<br>하나의 거대한 순환로로 다시 숨을 쉽니다."
-    : "정원 밖의 바닷길이 열렸습니다.<br>아직 만나지 못한 수호자와 지름길이 남아 있습니다.";
+    ? "포자 정원과 포자탑, 균문고, 배양로와 습지가<br>하나의 거대한 균사망으로 다시 숨을 쉽니다."
+    : "포자 정원 밖의 물길이 열렸습니다.<br>아직 만나지 못한 균사수호자와 지름길이 남아 있습니다.";
   const overlay = document.createElement("div");
   overlay.className = "overlay";
   overlay.innerHTML = `<div class="title-mark">✦</div><p class="kicker">${completeGarden ? "탐색도 100% · 순환의 결말" : "새로운 길은 닫히지 않습니다"}</p><h2>${endingTitle}</h2><p>${endingText}</p><button type="button">계속 탐험하기</button>`;

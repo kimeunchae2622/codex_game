@@ -24,23 +24,23 @@
       <canvas id="game" width="960" height="540" aria-label="게임 화면"></canvas>
       <div id="startScreen" class="overlay">
         <div class="title-mark">✦</div>
-        <p class="kicker">메아리가 잠든 지하 정원</p>
+        <p class="kicker">균사와 포자가 숨 쉬는 지하 왕국</p>
         <h2>짭로나이트</h2>
-        <p>세 개의 메아리 조각을 모으고<br>서로 이어진 세계의 수호자들에게 도전하세요.</p>
-        <button id="startButton" type="button">정원으로 내려가기</button>
+        <p>세 개의 포자 메아리를 모으고<br>끊어진 지하 균사망의 수호자들에게 도전하세요.</p>
+        <button id="startButton" type="button">포자 정원으로 내려가기</button>
         <button class="reset-button" data-reset-game type="button">처음부터 새 게임</button>
         <small>키보드 또는 아래 화면 버튼으로 플레이</small>
       </div>
       <div id="pauseScreen" class="overlay hidden">
         <p class="kicker">잠시 멈춤</p>
-        <h2>정원은 기다립니다</h2>
+        <h2>균사망은 기다립니다</h2>
         <button id="resumeButton" type="button">계속하기</button>
         <button id="pauseSettingsButton" type="button">설정</button>
         <button class="reset-button" data-reset-game type="button">진행 상황 초기화</button>
       </div>
       <div id="shopScreen" class="overlay shop-overlay hidden">
-        <p id="shopKicker" class="kicker">뿌리 상인의 작업대</p>
-        <h2 id="shopTitle">방랑자의 상점</h2>
+        <p id="shopKicker" class="kicker">포자 상인의 배양대</p>
+        <h2 id="shopTitle">균사 방랑자의 상점</h2>
         <p class="shop-wallet">보유 코인 <strong id="shopCoins">0</strong> ◈</p>
         <div id="shopGrid" class="shop-grid"></div>
         <p id="shopMessage" class="shop-message">방향키로 선택 · Z 구매 · A 나가기</p>
@@ -77,8 +77,8 @@
         <h2>설정</h2>
         <div class="settings-panel">
           <label for="musicVolume">
-            <span>BGM 음량 <output id="musicVolumeValue">90%</output></span>
-            <input id="musicVolume" type="range" min="0" max="100" step="5" value="90">
+            <span>BGM 음량 <output id="musicVolumeValue">95%</output></span>
+            <input id="musicVolume" type="range" min="0" max="100" step="5" value="95">
           </label>
           <label for="sfxVolume">
             <span>효과음 음량 <output id="sfxVolumeValue">75%</output></span>
